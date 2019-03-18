@@ -23,3 +23,24 @@ func TestGetCollections(t *testing.T) {
 		t.Fatalf("expected %v, got %v", expected, got)
 	}
 }
+
+func TestGetItem_ExistingItem(t *testing.T) {
+	got := loadTestIndex(t).GetItem("castles", "W418392510")
+	if got == nil || got.Properties["name"] != "Castello Scaligero" {
+		t.Fatalf("expected W418392510, got %v", got)
+	}
+}
+
+func TestGetItem_NoSuchCollection(t *testing.T) {
+	got := loadTestIndex(t).GetItem("no-such-collection", "123")
+	if got != nil {
+		t.Fatalf("expected nil, got %v", got)
+	}
+}
+
+func TestGetItem_NoSuchItem(t *testing.T) {
+	got := loadTestIndex(t).GetItem("castles", "unknown-id")
+	if got != nil {
+		t.Fatalf("expected nil, got %v", got)
+	}
+}

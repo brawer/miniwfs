@@ -20,8 +20,9 @@ type Index struct {
 }
 
 type Collection struct {
-	Features geojson.FeatureCollection
-	Path     string
+	Features     geojson.FeatureCollection
+	Path         string
+	featuresByID map[string]*geojson.Feature
 }
 
 func MakeIndex(collections map[string]string) (*Index, error) {
@@ -61,6 +62,18 @@ func (index *Index) GetCollections() []string {
 	}
 	sort.Strings(result)
 	return result
+}
+
+func (index *Index) GetItem(collection string, id string) *geojson.Feature {
+	index.mutex.RLock()
+	defer index.mutex.RUnlock()
+
+	coll := index.Collections[collection]
+	if coll == nil {
+		return nil
+	}
+
+	return coll.featuresByID[id]
 }
 
 func (index *Index) watchFiles() {
@@ -109,5 +122,28 @@ func readCollection(path string) (*Collection, error) {
 		return nil, err
 	}
 
+	byID := make(map[string]*geojson.Feature)
+	coll.featuresByID = byID
+	for _, f := range coll.Features.Features {
+		id := getString(f.ID)
+		if len(id) == 0 {
+			id = getString(f.Properties["id"])
+		}
+		if len(id) == 0 {
+			id = getString(f.Properties[".id"])
+		}
+		if len(id) > 0 {
+			byID[id] = f
+		}
+	}
+
 	return coll, nil
+}
+
+func getString(s interface{}) string {
+	if str, ok := s.(string); ok {
+		return str
+	} else {
+		return ""
+	}
 }
