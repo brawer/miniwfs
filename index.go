@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"path/filepath"
+	"sort"
 	"sync"
 	//"github.com/golang/geo/s2"
 )
@@ -34,7 +35,7 @@ func MakeIndex(collections map[string]string) (*Index, error) {
 
 	go index.watchFiles()
 	for name, path := range collections {
-		coll, err := ReadCollection(path)
+		coll, err := readCollection(path)
 		if err != nil {
 			return nil, err
 		}
@@ -58,7 +59,7 @@ func (index *Index) watchFiles() {
 				return
 			}
 			if event.Op&fsnotify.Write == fsnotify.Write {
-				if coll, err := ReadCollection(event.Name); err == nil {
+				if coll, err := readCollection(event.Name); err == nil {
 					index.replaceCollection(coll)
 				} else {
 					log.Printf("error reading collection %s: %v",
@@ -80,7 +81,7 @@ func (index *Index) replaceCollection(c *Collection) {
 	}
 }
 
-func ReadCollection(path string) (*Collection, error) {
+func readCollection(path string) (*Collection, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
@@ -97,4 +98,16 @@ func ReadCollection(path string) (*Collection, error) {
 	}
 
 	return coll, nil
+}
+
+func (index *Index) GetCollections() []string {
+	index.mutex.RLock()
+	defer index.mutex.RUnlock()
+
+	result := make([]string, 0, len(index.Collections))
+	for name, _ := range index.Collections {
+		result = append(result, name)
+	}
+	sort.Strings(result)
+	return result
 }
