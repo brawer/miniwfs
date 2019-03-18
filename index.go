@@ -51,6 +51,18 @@ func MakeIndex(collections map[string]string) (*Index, error) {
 	return index, nil
 }
 
+func (index *Index) GetCollections() []string {
+	index.mutex.RLock()
+	defer index.mutex.RUnlock()
+
+	result := make([]string, 0, len(index.Collections))
+	for name, _ := range index.Collections {
+		result = append(result, name)
+	}
+	sort.Strings(result)
+	return result
+}
+
 func (index *Index) watchFiles() {
 	for {
 		select {
@@ -98,16 +110,4 @@ func readCollection(path string) (*Collection, error) {
 	}
 
 	return coll, nil
-}
-
-func (index *Index) GetCollections() []string {
-	index.mutex.RLock()
-	defer index.mutex.RUnlock()
-
-	result := make([]string, 0, len(index.Collections))
-	for name, _ := range index.Collections {
-		result = append(result, name)
-	}
-	sort.Strings(result)
-	return result
 }

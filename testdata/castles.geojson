@@ -1,0 +1,41 @@
+{
+	"features": [
+	{
+		"geometry": {
+			"coordinates":[11.183468,47.910414],
+			"type":"Point"
+		},
+		"id": "N34729562",
+		"properties":{"historic":"castle","name":"Hochschloß Pähl"},
+		"type":"Feature"
+	},
+	{
+		"geometry": {
+			"coordinates":[
+				[10.6848117,45.6076336],
+				[10.6850828,45.6076897]],
+			"type":"LineString"
+		},
+		"id": "W418392510",
+		"properties":{
+			"barrier":"city_wall",
+			"historic":"castle",
+			"name":"Castello Scaligero",
+			"wikipedia":"it:Castello Scaligero (Torri del Benaco)"
+		},
+		"type":"Feature"
+	},
+	{
+		"geometry":{
+			"coordinates":[
+				[[11.1221624,46.0670118],[11.1221546,46.0670507],[11.1221723,46.0670574],[11.1221842,46.0670731],[11.1221869,46.067097],[11.1221766,46.0671192],[11.1221453,46.067136],[11.1221161,46.0671393],[11.1220222,46.0674756],[11.1219216,46.0674735],[11.1219202,46.0675053],[11.1218793,46.0675034],[11.1218347,46.0675014],[11.1218655,46.0672963],[11.1218916,46.0670783],[11.1218991,46.0669992],[11.1220515,46.067004],[11.1221624,46.0670118]]],
+			"type":"Polygon"},
+		"properties":{
+			".id":"W24785843",
+			"building":"yes",
+			"historic":"castle",
+			"name":"Palazzo Pretorio",
+			"wikidata":"Q26997946"
+		}
+	}]
+}

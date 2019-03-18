@@ -1,0 +1,12 @@
+{
+	"features": [
+	{
+		"geometry": {
+			"coordinates": [11.183468, 47.910414],
+			"type": "Point"
+		},
+		"id": "N123",
+		"properties":{"natural": "lake", "name": "Katzensee"},
+		"type":"Feature"
+	}]
+}

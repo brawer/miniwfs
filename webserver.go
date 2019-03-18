@@ -70,5 +70,4 @@ func (s *WebServer) HandleCollections(w http.ResponseWriter, _ *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
-	//    	 {"links":[{"href":"http://cloudsdi.geo-solutions.it:80/geoserver/wfs3/collections/?f=application%2Fjson","rel":"self","type":"application/json","title":"This document"},{"href":"http://c
 }
