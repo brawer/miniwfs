@@ -68,6 +68,7 @@ func (s *WebServer) HandleCollections(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
 }

@@ -22,7 +22,7 @@ func main() {
 	for _, s := range strings.Split(*collections, ",") {
 		p := strings.SplitN(s, "=", 2)
 		if p == nil || len(p) != 2 {
-			log.Fatal("malformed --collections command-line argument; pass something like --collections=castles=path/to/c.geojson,--lakes=path/to/l.geojson")
+			log.Fatal("malformed --collections command-line argument; pass something like --collections=castles=path/to/c.geojson,lakes=path/to/l.geojson")
 		}
 		coll[p[0]] = p[1]
 	}
