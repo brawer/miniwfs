@@ -36,6 +36,7 @@ func main() {
 
 	server := MakeWebServer(index, *publicPathPrefix)
 	http.HandleFunc("/collections", server.HandleCollections)
+	http.HandleFunc("/collections/", server.HandleCollections)
 	log.Printf("Listening for requests on port %v\n", strconv.Itoa(*port))
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*port), nil))
 }

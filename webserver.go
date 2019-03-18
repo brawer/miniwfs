@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	//"fmt"
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 )
 
 type WebServer struct {
@@ -21,7 +23,14 @@ func MakeWebServer(index *Index, publicPathPrefix string) *WebServer {
 	return s
 }
 
-func (s *WebServer) HandleCollections(w http.ResponseWriter, _ *http.Request) {
+var itemRegexp = regexp.MustCompile(`^/collections/([^/]+)/items/(.+)$`)
+
+func (s *WebServer) HandleCollections(w http.ResponseWriter, req *http.Request) {
+	if m := itemRegexp.FindStringSubmatch(req.URL.Path); len(m) == 3 {
+		s.HandleItemRequest(w, req, m[1], m[2])
+		return
+	}
+
 	type WFSLink struct {
 		Href  string `json:"href"`
 		Rel   string `json:"rel"`
@@ -69,6 +78,26 @@ func (s *WebServer) HandleCollections(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
+}
+
+func (s *WebServer) HandleItemRequest(w http.ResponseWriter, req *http.Request,
+	collection string, item string) {
+	feature := s.index.GetItem(collection, item)
+	if feature == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	encoded, err := json.Marshal(feature)
+	if err != nil {
+		log.Printf("json.Marshal failed: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/geo+json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
 }

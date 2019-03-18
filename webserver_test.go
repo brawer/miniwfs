@@ -56,7 +56,7 @@ func TestCollections(t *testing.T) {
 	handler.ServeHTTP(resp, query)
 
 	if ct := resp.Header().Get("Content-Type"); ct != "application/json" {
-		t.Errorf("Expected Content-Type application/json, got %s", ct)
+		t.Errorf("Expected Content-Type: application/json, got %s", ct)
 	}
 
 	expectJSON(t, getBody(resp), `{
@@ -92,5 +92,33 @@ func TestCollections(t *testing.T) {
               ]
             }
           ]
+        }`)
+}
+
+func TestItem(t *testing.T) {
+	s := makeServer(t)
+	query, _ := http.NewRequest("GET", "/collections/lakes/items/N123", nil)
+	handler := http.HandlerFunc(s.HandleCollections)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, query)
+
+	if ct := resp.Header().Get("Content-Type"); ct != "application/geo+json" {
+		t.Errorf("Expected Content-Type: application/geo+json, got %s", ct)
+	}
+
+	expectJSON(t, getBody(resp), `{
+          "id": "N123",
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              11.183468,
+              47.910414
+            ]
+          },
+          "properties": {
+            "name": "Katzensee",
+            "natural": "lake"
+          }
         }`)
 }
