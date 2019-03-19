@@ -75,7 +75,7 @@ func TestCollections(t *testing.T) {
                 {
                   "href": "https://test.example.org/wfs/collections/castles",
                   "rel": "item",
-                  "type": "application/vnd.geo+json",
+                  "type": "application/geo+json",
                   "title": "castles"
                 }
               ]
@@ -86,7 +86,7 @@ func TestCollections(t *testing.T) {
                 {
                   "href": "https://test.example.org/wfs/collections/lakes",
                   "rel": "item",
-                  "type": "application/vnd.geo+json",
+                  "type": "application/geo+json",
                   "title": "lakes"
                 }
               ]

@@ -53,7 +53,7 @@ func (s *WebServer) HandleCollections(w http.ResponseWriter, req *http.Request) 
 		link := WFSLink{
 			Href:  s.publicPath.String() + "collections/" + name,
 			Rel:   "item",
-			Type:  "application/vnd.geo+json",
+			Type:  "application/geo+json",
 			Title: name,
 		}
 		wfsColl := WFSCollection{Name: name, Links: []WFSLink{link}}
