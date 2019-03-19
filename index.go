@@ -78,6 +78,33 @@ func (index *Index) GetItem(collection string, id string) *geojson.Feature {
 	return coll.featuresByID[id]
 }
 
+func (index *Index) GetItems(collection string, bbox s2.Rect) *geojson.FeatureCollection {
+	index.mutex.RLock()
+	defer index.mutex.RUnlock()
+
+	coll := index.Collections[collection]
+	if coll == nil {
+		return nil
+	}
+
+	// If we had more data, we could compute s2 cell coverages and only
+	// check the intersection for features inside the coverage area.
+	// But we operate on a few thousand features, so let's keep things simple
+	// for the time being.
+	result := &geojson.FeatureCollection{}
+	bounds := s2.EmptyRect()
+	for i, f := range coll.Features.Features {
+		featureBounds := coll.bbox[i]
+		if bbox.Intersects(featureBounds) {
+			result.Features = append(result.Features, f)
+			bounds = bounds.Union(featureBounds)
+		}
+	}
+
+	// TODO: Return bounds in feature collection.
+	return result
+}
+
 func (index *Index) watchFiles() {
 	for {
 		select {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/golang/geo/s2"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -40,6 +41,21 @@ func TestGetItem_NoSuchCollection(t *testing.T) {
 
 func TestGetItem_NoSuchItem(t *testing.T) {
 	got := loadTestIndex(t).GetItem("castles", "unknown-id")
+	if got != nil {
+		t.Fatalf("expected nil, got %v", got)
+	}
+}
+
+func TestGetItems_EmptyBbox(t *testing.T) {
+	got := loadTestIndex(t).GetItems("castles", s2.EmptyRect())
+	expectFeatureCollection(t, got, `{
+		"type": "FeatureCollection",
+		"features": []
+	}`)
+}
+
+func TestGetItems_NoSuchCollection(t *testing.T) {
+	got := loadTestIndex(t).GetItems("no-such-collection", s2.FullRect())
 	if got != nil {
 		t.Fatalf("expected nil, got %v", got)
 	}

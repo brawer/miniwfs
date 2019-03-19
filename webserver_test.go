@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"github.com/paulmach/go.geojson"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -46,6 +47,15 @@ func expectJSON(t *testing.T, got string, expected string) {
 		t.Fatalf("expected: %s\ngot:      %s\n",
 			prettyExpected.String(), prettyGot.String())
 	}
+}
+
+func expectFeatureCollection(t *testing.T, got *geojson.FeatureCollection,
+	expected string) {
+	gotJSON, err := got.MarshalJSON()
+	if err != nil {
+		t.Fatalf("cannot marshal to JSON: %s", err)
+	}
+	expectJSON(t, string(gotJSON), expected)
 }
 
 func TestCollections(t *testing.T) {
