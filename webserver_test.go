@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -58,10 +59,27 @@ func expectFeatureCollection(t *testing.T, got *geojson.FeatureCollection,
 	expectJSON(t, string(gotJSON), expected)
 }
 
+func TestHome(t *testing.T) {
+	s := makeServer(t)
+	query, _ := http.NewRequest("GET", "/", nil)
+	handler := http.HandlerFunc(s.HandleRequest)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, query)
+
+	if ct := resp.Header().Get("Content-Type"); ct != "text/html; charset=utf-8" {
+		t.Errorf("Expected Content-Type HTML, got %s", ct)
+	}
+
+	body := getBody(resp)
+	if !strings.Contains(body, "WFS3") {
+		t.Errorf("Expected homepage; got %s", body)
+	}
+}
+
 func TestCollections(t *testing.T) {
 	s := makeServer(t)
 	query, _ := http.NewRequest("GET", "/collections", nil)
-	handler := http.HandlerFunc(s.HandleCollections)
+	handler := http.HandlerFunc(s.HandleRequest)
 	resp := httptest.NewRecorder()
 	handler.ServeHTTP(resp, query)
 
@@ -108,7 +126,7 @@ func TestCollections(t *testing.T) {
 func TestItem(t *testing.T) {
 	s := makeServer(t)
 	query, _ := http.NewRequest("GET", "/collections/lakes/items/N123", nil)
-	handler := http.HandlerFunc(s.HandleCollections)
+	handler := http.HandlerFunc(s.HandleRequest)
 	resp := httptest.NewRecorder()
 	handler.ServeHTTP(resp, query)
 

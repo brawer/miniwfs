@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	//"fmt"
+	"html"
 	"log"
 	"net/http"
 	"net/url"
@@ -23,14 +25,46 @@ func MakeWebServer(index *Index, publicPathPrefix string) *WebServer {
 	return s
 }
 
+var collectionsRegexp = regexp.MustCompile(`^/collections/?$`)
 var itemRegexp = regexp.MustCompile(`^/collections/([^/]+)/items/(.+)$`)
 
-func (s *WebServer) HandleCollections(w http.ResponseWriter, req *http.Request) {
+func (s *WebServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	if m := itemRegexp.FindStringSubmatch(req.URL.Path); len(m) == 3 {
-		s.HandleItemRequest(w, req, m[1], m[2])
+		s.handleItemRequest(w, req, m[1], m[2])
 		return
 	}
 
+	if m := collectionsRegexp.FindStringSubmatch(req.URL.Path); len(m) == 1 {
+		s.handleCollectionsRequest(w, req)
+		return
+	}
+
+	if req.URL.Path == "/" {
+		s.handleHomeRequest(w, req)
+	}
+	w.WriteHeader(http.StatusNotFound)
+}
+
+func (s *WebServer) handleHomeRequest(w http.ResponseWriter, req *http.Request) {
+	url := html.EscapeString(s.publicPath.String() + "collections")
+
+	var out bytes.Buffer
+	out.WriteString(
+		"<html><body><h1>MiniWFS</h1>" +
+			"<p>Hello! This is a <a href=\"https://github.com/brawer/miniwfs\">" +
+			"MiniWFS</a> server. To use it, point any WFS3 client to <a href=\"")
+	out.WriteString(url)
+	out.WriteString("\">")
+	out.WriteString(url)
+	out.WriteString("</a>.</p></html>")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	out.WriteTo(w)
+
+}
+
+func (s *WebServer) handleCollectionsRequest(w http.ResponseWriter, req *http.Request) {
 	type WFSLink struct {
 		Href  string `json:"href"`
 		Rel   string `json:"rel"`
@@ -82,7 +116,7 @@ func (s *WebServer) HandleCollections(w http.ResponseWriter, req *http.Request) 
 	w.Write(encoded)
 }
 
-func (s *WebServer) HandleItemRequest(w http.ResponseWriter, req *http.Request,
+func (s *WebServer) handleItemRequest(w http.ResponseWriter, req *http.Request,
 	collection string, item string) {
 	feature := s.index.GetItem(collection, item)
 	if feature == nil {
