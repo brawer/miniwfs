@@ -87,6 +87,7 @@ func TestCollections(t *testing.T) {
 		t.Errorf("Expected Content-Type: application/json, got %s", ct)
 	}
 
+	expectCORSHeader(t, resp.Header())
 	expectJSON(t, getBody(resp), `{
           "links": [
             {
@@ -134,6 +135,7 @@ func TestItem(t *testing.T) {
 		t.Errorf("Expected Content-Type: application/geo+json, got %s", ct)
 	}
 
+	expectCORSHeader(t, resp.Header())
 	expectJSON(t, getBody(resp), `{
           "id": "N123",
           "type": "Feature",
@@ -149,4 +151,10 @@ func TestItem(t *testing.T) {
             "natural": "lake"
           }
         }`)
+}
+
+func expectCORSHeader(t *testing.T, header http.Header) {
+     if cors := header.Get("Access-Control-Allow-Origin"); cors != "*" {
+     	t.Errorf("expected header \"Access-Control-Allow-Origin: *\", got %s", cors)
+     }
 }

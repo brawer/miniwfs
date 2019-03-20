@@ -111,6 +111,7 @@ func (s *WebServer) handleCollectionsRequest(w http.ResponseWriter, req *http.Re
 		return
 	}
 
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
@@ -131,6 +132,7 @@ func (s *WebServer) handleItemRequest(w http.ResponseWriter, req *http.Request,
 		return
 	}
 
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/geo+json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
