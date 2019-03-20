@@ -6,6 +6,7 @@
 # $ docker run -p 8080:8080 --mount type=bind,source=/Users/sascha/src/miniwfs/data,target=/var/miniwfs -it brawer/miniwfs --collections castles=/var/miniwfs/castles.geojson
 #
 # $ curl http://localhost:8080/collections
+# $ curl http://localhost:8080/collections/castles/items?bbox=11.18,47.91,11.19,47.92
 # $ curl http://localhost:8080/collections/castles/items/W548140156
 # $ curl http://localhost:8080/metrics
 
