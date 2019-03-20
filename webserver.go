@@ -3,12 +3,17 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	//"fmt"
 	"html"
 	"log"
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/golang/geo/s2"
 )
 
 type WebServer struct {
@@ -25,23 +30,30 @@ func MakeWebServer(index *Index, publicPathPrefix string) *WebServer {
 	return s
 }
 
-var collectionsRegexp = regexp.MustCompile(`^/collections/?$`)
+var collectionRegexp = regexp.MustCompile(`^/collections/([^/]+)/items$`)
 var itemRegexp = regexp.MustCompile(`^/collections/([^/]+)/items/(.+)$`)
+var listCollectionsRegexp = regexp.MustCompile(`^/collections/?$`)
 
 func (s *WebServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
+	if m := collectionRegexp.FindStringSubmatch(req.URL.Path); len(m) == 2 {
+		s.handleCollectionRequest(w, req, m[1])
+		return
+	}
+
 	if m := itemRegexp.FindStringSubmatch(req.URL.Path); len(m) == 3 {
 		s.handleItemRequest(w, req, m[1], m[2])
 		return
 	}
 
-	if m := collectionsRegexp.FindStringSubmatch(req.URL.Path); len(m) == 1 {
-		s.handleCollectionsRequest(w, req)
+	if m := listCollectionsRegexp.FindStringSubmatch(req.URL.Path); len(m) == 1 {
+		s.handleListCollectionsRequest(w, req)
 		return
 	}
 
 	if req.URL.Path == "/" {
 		s.handleHomeRequest(w, req)
 	}
+
 	w.WriteHeader(http.StatusNotFound)
 }
 
@@ -64,7 +76,7 @@ func (s *WebServer) handleHomeRequest(w http.ResponseWriter, req *http.Request) 
 
 }
 
-func (s *WebServer) handleCollectionsRequest(w http.ResponseWriter, req *http.Request) {
+func (s *WebServer) handleListCollectionsRequest(w http.ResponseWriter, req *http.Request) {
 	type WFSLink struct {
 		Href  string `json:"href"`
 		Rel   string `json:"rel"`
@@ -115,6 +127,72 @@ func (s *WebServer) handleCollectionsRequest(w http.ResponseWriter, req *http.Re
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
+}
+
+func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Request,
+	collection string) {
+	params := req.URL.Query()
+	bbox, err := parseBbox(params.Get("bbox"))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	result := s.index.GetItems(collection, bbox)
+	if result == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		log.Printf("json.Marshal failed: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/geo+json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
+}
+
+var malformedBbox error = errors.New("malformed bbox parameter")
+
+func parseBbox(s string) (s2.Rect, error) {
+	s = strings.TrimSpace(s)
+	if len(s) == 0 {
+		return s2.FullRect(), nil
+	}
+
+	bbox := s2.EmptyRect()
+	parts := strings.Split(s, ",")
+	n := make([]float64, len(parts))
+	var err error
+	for i, part := range parts {
+		n[i], err = strconv.ParseFloat(strings.TrimSpace(part), 64)
+		if err != nil {
+			return bbox, err
+		}
+	}
+
+	if len(n) == 4 {
+		bbox = bbox.AddPoint(s2.LatLngFromDegrees(n[1], n[0]))
+		bbox = bbox.AddPoint(s2.LatLngFromDegrees(n[3], n[2]))
+		if bbox.IsValid() {
+			return bbox, nil
+		}
+	}
+
+	if len(n) == 6 {
+		bbox = bbox.AddPoint(s2.LatLngFromDegrees(n[1], n[0]))
+		bbox = bbox.AddPoint(s2.LatLngFromDegrees(n[4], n[3]))
+		if bbox.IsValid() {
+			return bbox, nil
+		}
+	}
+
+	return s2.EmptyRect(), malformedBbox
 }
 
 func (s *WebServer) handleItemRequest(w http.ResponseWriter, req *http.Request,

@@ -11,6 +11,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/golang/geo/s2"
 )
 
 func makeServer(t *testing.T) *WebServer {
@@ -59,6 +61,45 @@ func expectFeatureCollection(t *testing.T, got *geojson.FeatureCollection,
 	expectJSON(t, string(gotJSON), expected)
 }
 
+func TestParseBbox_emptyString(t *testing.T) {
+	bbox, err := parseBbox("")
+	if !bbox.IsFull() || err != nil {
+		t.Errorf("expected (full-bbox, nil), got (%s, %s)", bbox, err)
+	}
+}
+
+func TestParseBbox_2D(t *testing.T) {
+	bbox, err := parseBbox(" -8.5, -47.9, -8.9 , -49.2")
+	if err != nil {
+		t.Errorf("expected nil error, got %s", err)
+		return
+	}
+
+	if bbox.Lo().Distance(s2.LatLngFromDegrees(-49.2, -8.9)) > 0.001 {
+		t.Errorf("expected bbox.Lo=(-49.2, -8.9) error, got %s", bbox.Lo())
+	}
+
+	if bbox.Hi().Distance(s2.LatLngFromDegrees(-47.9, -8.5)) > 0.001 {
+		t.Errorf("expected bbox.Hi=(-47.9, -8.5) error, got %s", bbox.Lo())
+	}
+}
+
+func TestParseBbox_3D(t *testing.T) {
+	bbox, err := parseBbox("-8.5,-47.9,-100,-8.9,-49.2,1400")
+	if err != nil {
+		t.Errorf("expected nil error, got %s", err)
+		return
+	}
+
+	if bbox.Lo().Distance(s2.LatLngFromDegrees(-49.2, -8.9)) > 0.001 {
+		t.Errorf("expected bbox.Lo=(-49.2, -8.9) error, got %s", bbox.Lo())
+	}
+
+	if bbox.Hi().Distance(s2.LatLngFromDegrees(-47.9, -8.5)) > 0.001 {
+		t.Errorf("expected bbox.Hi=(-47.9, -8.5) error, got %s", bbox.Lo())
+	}
+}
+
 func TestHome(t *testing.T) {
 	s := makeServer(t)
 	query, _ := http.NewRequest("GET", "/", nil)
@@ -76,7 +117,7 @@ func TestHome(t *testing.T) {
 	}
 }
 
-func TestCollections(t *testing.T) {
+func TestListCollections(t *testing.T) {
 	s := makeServer(t)
 	query, _ := http.NewRequest("GET", "/collections", nil)
 	handler := http.HandlerFunc(s.HandleRequest)
@@ -124,6 +165,40 @@ func TestCollections(t *testing.T) {
         }`)
 }
 
+func TestCollection(t *testing.T) {
+	s := makeServer(t)
+	query, _ := http.NewRequest("GET", "/collections/castles/items?bbox=11.183467,47.910413,11.183469,47.910415", nil)
+	handler := http.HandlerFunc(s.HandleRequest)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, query)
+
+	if ct := resp.Header().Get("Content-Type"); ct != "application/geo+json" {
+		t.Errorf("Expected Content-Type: application/geo+json, got %s", ct)
+	}
+
+	expectCORSHeader(t, resp.Header())
+	expectJSON(t, getBody(resp), `{
+          "type": "FeatureCollection",
+          "features": [
+            {
+              "id": "N34729562",
+              "type": "Feature",
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  11.183468,
+                  47.910414
+                ]
+              },
+              "properties": {
+                "historic": "castle",
+                "name": "Hochschloß Pähl"
+              }
+            }
+          ]
+        }`)
+}
+
 func TestItem(t *testing.T) {
 	s := makeServer(t)
 	query, _ := http.NewRequest("GET", "/collections/lakes/items/N123", nil)
@@ -154,7 +229,7 @@ func TestItem(t *testing.T) {
 }
 
 func expectCORSHeader(t *testing.T, header http.Header) {
-     if cors := header.Get("Access-Control-Allow-Origin"); cors != "*" {
-     	t.Errorf("expected header \"Access-Control-Allow-Origin: *\", got %s", cors)
-     }
+	if cors := header.Get("Access-Control-Allow-Origin"); cors != "*" {
+		t.Errorf("expected header \"Access-Control-Allow-Origin: *\", got %s", cors)
+	}
 }
