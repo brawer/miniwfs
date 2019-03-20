@@ -7,6 +7,7 @@ import (
 	"log"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
@@ -163,14 +164,15 @@ func readCollection(path string) (*Collection, error) {
 	coll.featuresByID = byID
 
 	for _, f := range coll.Features.Features {
-		id := getString(f.ID)
+		id := getIDString(f.ID)
 		if len(id) == 0 {
-			id = getString(f.Properties["id"])
+			id = getIDString(f.Properties["id"])
 		}
 		if len(id) == 0 {
-			id = getString(f.Properties[".id"])
+			id = getIDString(f.Properties[".id"])
 		}
 		if len(id) > 0 {
+			f.ID = id
 			byID[id] = f
 		}
 	}
@@ -178,9 +180,11 @@ func readCollection(path string) (*Collection, error) {
 	return coll, nil
 }
 
-func getString(s interface{}) string {
+func getIDString(s interface{}) string {
 	if str, ok := s.(string); ok {
 		return str
+	} else if i, ok := s.(int64); ok {
+		return strconv.FormatInt(i, 10)
 	} else {
 		return ""
 	}
