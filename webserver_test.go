@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/golang/geo/s2"
-	"github.com/paulmach/go.geojson"
 )
 
 func makeServer(t *testing.T) *WebServer {
@@ -52,9 +51,9 @@ func expectJSON(t *testing.T, got string, expected string) {
 	}
 }
 
-func expectFeatureCollection(t *testing.T, got *geojson.FeatureCollection,
+func expectFeatureCollection(t *testing.T, got *WFSFeatureCollection,
 	expected string) {
-	gotJSON, err := got.MarshalJSON()
+	gotJSON, err := json.Marshal(got)
 	if err != nil {
 		t.Fatalf("cannot marshal to JSON: %s", err)
 	}

@@ -77,12 +77,6 @@ func (s *WebServer) handleHomeRequest(w http.ResponseWriter, req *http.Request) 
 }
 
 func (s *WebServer) handleListCollectionsRequest(w http.ResponseWriter, req *http.Request) {
-	type WFSLink struct {
-		Href  string `json:"href"`
-		Rel   string `json:"rel"`
-		Type  string `json:"type"`
-		Title string `json:"title"`
-	}
 	type WFSCollection struct {
 		Name  string    `json:"name"`
 		Links []WFSLink `json:"links"`

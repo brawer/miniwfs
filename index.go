@@ -83,7 +83,7 @@ func (index *Index) GetItem(collection string, id string) *geojson.Feature {
 	}
 }
 
-func (index *Index) GetItems(collection string, limit int, bbox s2.Rect) *geojson.FeatureCollection {
+func (index *Index) GetItems(collection string, limit int, bbox s2.Rect) *WFSFeatureCollection {
 	index.mutex.RLock()
 	defer index.mutex.RUnlock()
 
@@ -102,7 +102,8 @@ func (index *Index) GetItems(collection string, limit int, bbox s2.Rect) *geojso
 	// check the intersection for features inside the coverage area.
 	// But we operate on a few thousand features, so let's keep things simple
 	// for the time being.
-	result := &geojson.FeatureCollection{}
+	result := &WFSFeatureCollection{Type: "FeatureCollection"}
+	result.Features = make([]*geojson.Feature, 0, 50)
 	bounds := s2.EmptyRect()
 	var nextID string
 	for i, featureBounds := range coll.bbox {
