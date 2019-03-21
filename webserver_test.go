@@ -15,7 +15,7 @@ import (
 )
 
 func makeServer(t *testing.T) *WebServer {
-	return MakeWebServer(loadTestIndex(t), "https://test.example.org/wfs/")
+	return MakeWebServer(loadTestIndex(t))
 }
 
 func getBody(r *httptest.ResponseRecorder) string {

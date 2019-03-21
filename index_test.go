@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"net/url"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -13,7 +15,10 @@ import (
 func loadTestIndex(t *testing.T) *Index {
 	p1 := filepath.Join("testdata", "castles.geojson")
 	p2 := filepath.Join("testdata", "lakes.geojson")
-	index, err := MakeIndex(map[string]string{"castles": p1, "lakes": p2})
+
+	publicPath, _ := url.Parse("https://test.example.org/wfs/")
+	index, err := MakeIndex(map[string]string{"castles": p1, "lakes": p2},
+		publicPath)
 	if index == nil || err != nil {
 		t.Fatalf("failed making index: %s", err)
 	}
@@ -65,7 +70,15 @@ func TestGetItems_LimitExceeded(t *testing.T) {
 		t.Errorf("expected %s, got %s", expectedIDs, gotIDs)
 		return
 	}
-	// TODO: Check got.Next
+	links, _ := json.Marshal(got.Links)
+	expectJSON(t, string(links), `[
+          {
+            "href": "https://test.example.org/wfs/collections/castles/items?start=W24785843\u0026limit=2",
+            "rel": "next",
+            "type": "application/geo+json",
+            "title": "next"
+          }
+        ]`)
 }
 
 func TestGetItems_NoSuchCollection(t *testing.T) {

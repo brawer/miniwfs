@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	//"fmt"
+	"html"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -18,6 +20,7 @@ import (
 type Index struct {
 	Collections map[string]*Collection
 	mutex       sync.RWMutex
+	PublicPath  *url.URL
 	watcher     *fsnotify.Watcher
 }
 
@@ -28,8 +31,11 @@ type Collection struct {
 	byID     map[string]int // "W77" -> 3 if Features[3].ID == "W77"
 }
 
-func MakeIndex(collections map[string]string) (*Index, error) {
-	index := &Index{Collections: make(map[string]*Collection)}
+func MakeIndex(collections map[string]string, publicPath *url.URL) (*Index, error) {
+	index := &Index{
+		Collections: make(map[string]*Collection),
+		PublicPath:  publicPath,
+	}
 
 	if watcher, err := fsnotify.NewWatcher(); err == nil {
 		index.watcher = watcher
@@ -122,6 +128,15 @@ func (index *Index) GetItems(collection string, limit int, bbox s2.Rect) *WFSFea
 
 	if len(nextID) > 0 {
 		// TODO: Return nextID as part of result.
+		nextLink := &WFSLink{
+			Rel:   "next",
+			Title: "next",
+			Type:  "application/geo+json",
+		}
+		nextLink.Href = index.PublicPath.String() + "collections/" + html.EscapeString(collection) + "/items?start=" + html.EscapeString(nextID) + "&limit=" + strconv.Itoa(limit)
+		// TODO: Omit limit if it has default value
+		// TODO: also add bbox param, unless it is entire world
+		result.Links = append(result.Links, nextLink)
 	}
 
 	result.BoundingBox = encodeBbox(bounds)

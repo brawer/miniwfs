@@ -8,7 +8,6 @@ import (
 	"html"
 	"log"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -17,16 +16,11 @@ import (
 )
 
 type WebServer struct {
-	index      *Index
-	publicPath *url.URL
+	index *Index
 }
 
-func MakeWebServer(index *Index, publicPathPrefix string) *WebServer {
-	publicPath, err := url.Parse(publicPathPrefix)
-	if err != nil {
-		log.Fatal(err)
-	}
-	s := &WebServer{index: index, publicPath: publicPath}
+func MakeWebServer(index *Index) *WebServer {
+	s := &WebServer{index: index}
 	return s
 }
 
@@ -58,7 +52,7 @@ func (s *WebServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *WebServer) handleHomeRequest(w http.ResponseWriter, req *http.Request) {
-	url := html.EscapeString(s.publicPath.String() + "collections")
+	url := html.EscapeString(s.index.PublicPath.String() + "collections")
 
 	var out bytes.Buffer
 	out.WriteString(
@@ -91,7 +85,7 @@ func (s *WebServer) handleListCollectionsRequest(w http.ResponseWriter, req *htt
 	wfsCollections := make([]WFSCollection, 0, len(collections))
 	for _, name := range collections {
 		link := WFSLink{
-			Href:  s.publicPath.String() + "collections/" + name,
+			Href:  s.index.PublicPath.String() + "collections/" + name,
 			Rel:   "item",
 			Type:  "application/geo+json",
 			Title: name,
@@ -101,7 +95,7 @@ func (s *WebServer) handleListCollectionsRequest(w http.ResponseWriter, req *htt
 	}
 
 	selfLink := WFSLink{
-		Href: s.publicPath.String() + "collections",
+		Href: s.index.PublicPath.String() + "collections",
 		Rel:  "self", Type: "application/json", Title: "Collections",
 	}
 

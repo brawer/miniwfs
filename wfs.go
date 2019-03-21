@@ -13,7 +13,7 @@ type WFSLink struct {
 
 type WFSFeatureCollection struct {
 	Type        string             `json:"type"`
-	Links       []WFSLink          `json:"links,omitempty"`
+	Links       []*WFSLink         `json:"links,omitempty"`
 	BoundingBox []float64          `json:"bbox,omitempty"`
 	Features    []*geojson.Feature `json:"features"`
 }

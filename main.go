@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -27,14 +28,19 @@ func main() {
 		coll[p[0]] = p[1]
 	}
 
-	index, err := MakeIndex(coll)
+	publicPath, err := url.Parse(*publicPathPrefix)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	index, err := MakeIndex(coll, publicPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	http.Handle("/metrics", promhttp.Handler())
 
-	server := MakeWebServer(index, *publicPathPrefix)
+	server := MakeWebServer(index)
 	http.HandleFunc("/collections", server.HandleRequest)
 	http.HandleFunc("/collections/", server.HandleRequest)
 	log.Printf("Listening for requests on port %v\n", strconv.Itoa(*port))
