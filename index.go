@@ -98,10 +98,10 @@ func (index *Index) GetItems(collection string, bbox s2.Rect) *geojson.FeatureCo
 	// for the time being.
 	result := &geojson.FeatureCollection{}
 	bounds := s2.EmptyRect()
-	for i, f := range coll.Features.Features {
-		featureBounds := coll.bbox[i]
+	for i, featureBounds := range coll.bbox {
 		if bbox.Intersects(featureBounds) {
-			result.Features = append(result.Features, f)
+			result.Features = append(result.Features,
+				coll.Features.Features[i])
 			bounds = bounds.Union(featureBounds)
 		}
 	}
