@@ -146,7 +146,7 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 
 	bbox, err := parseBbox(params.Get("bbox"))
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
