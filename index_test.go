@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/golang/geo/s2"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/golang/geo/s2"
 )
 
 func loadTestIndex(t *testing.T) *Index {

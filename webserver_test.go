@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"github.com/paulmach/go.geojson"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/golang/geo/s2"
+	"github.com/paulmach/go.geojson"
 )
 
 func makeServer(t *testing.T) *WebServer {
@@ -179,6 +179,12 @@ func TestCollection(t *testing.T) {
 	expectCORSHeader(t, resp.Header())
 	expectJSON(t, getBody(resp), `{
           "type": "FeatureCollection",
+          "bbox": [
+            11.183468,
+            47.910414,
+            11.183468,
+            47.910414
+          ],
           "features": [
             {
               "id": "N34729562",
