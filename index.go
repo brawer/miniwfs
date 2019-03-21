@@ -22,10 +22,10 @@ type Index struct {
 }
 
 type Collection struct {
-	Features     geojson.FeatureCollection
-	bbox         []s2.Rect
-	Path         string
-	featuresByID map[string]*geojson.Feature
+	Features geojson.FeatureCollection
+	bbox     []s2.Rect
+	Path     string
+	byID     map[string]int // "W77" -> 3 if Features[3].ID == "W77"
 }
 
 func MakeIndex(collections map[string]string) (*Index, error) {
@@ -76,7 +76,11 @@ func (index *Index) GetItem(collection string, id string) *geojson.Feature {
 		return nil
 	}
 
-	return coll.featuresByID[id]
+	if index, ok := coll.byID[id]; ok {
+		return coll.Features.Features[index]
+	} else {
+		return nil
+	}
 }
 
 func (index *Index) GetItems(collection string, bbox s2.Rect) *geojson.FeatureCollection {
@@ -160,10 +164,10 @@ func readCollection(path string) (*Collection, error) {
 		}
 	}
 
-	byID := make(map[string]*geojson.Feature)
-	coll.featuresByID = byID
+	byID := make(map[string]int)
+	coll.byID = byID
 
-	for _, f := range coll.Features.Features {
+	for i, f := range coll.Features.Features {
 		id := getIDString(f.ID)
 		if len(id) == 0 {
 			id = getIDString(f.Properties["id"])
@@ -173,7 +177,7 @@ func readCollection(path string) (*Collection, error) {
 		}
 		if len(id) > 0 {
 			f.ID = id
-			byID[id] = f
+			byID[id] = i
 		}
 	}
 
