@@ -83,9 +83,15 @@ func (index *Index) GetItem(collection string, id string) *geojson.Feature {
 	}
 }
 
-func (index *Index) GetItems(collection string, bbox s2.Rect) *geojson.FeatureCollection {
+func (index *Index) GetItems(collection string, limit int, bbox s2.Rect) *geojson.FeatureCollection {
 	index.mutex.RLock()
 	defer index.mutex.RUnlock()
+
+	if limit < 1 {
+		limit = 1
+	} else if limit > 10000 {
+		limit = 10000
+	}
 
 	coll := index.Collections[collection]
 	if coll == nil {
@@ -98,12 +104,23 @@ func (index *Index) GetItems(collection string, bbox s2.Rect) *geojson.FeatureCo
 	// for the time being.
 	result := &geojson.FeatureCollection{}
 	bounds := s2.EmptyRect()
+	var nextID string
 	for i, featureBounds := range coll.bbox {
-		if bbox.Intersects(featureBounds) {
-			result.Features = append(result.Features,
-				coll.Features.Features[i])
-			bounds = bounds.Union(featureBounds)
+		if !bbox.Intersects(featureBounds) {
+			continue
 		}
+
+		feature := coll.Features.Features[i]
+		if len(result.Features) >= limit {
+			nextID = getIDString(feature.ID)
+			break
+		}
+		result.Features = append(result.Features, feature)
+		bounds = bounds.Union(featureBounds)
+	}
+
+	if len(nextID) > 0 {
+		// TODO: Return nextID as part of result.
 	}
 
 	result.BoundingBox = encodeBbox(bounds)

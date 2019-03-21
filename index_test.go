@@ -3,9 +3,11 @@ package main
 import (
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/golang/geo/s2"
+	"github.com/paulmach/go.geojson"
 )
 
 func loadTestIndex(t *testing.T) *Index {
@@ -48,16 +50,35 @@ func TestGetItem_NoSuchItem(t *testing.T) {
 }
 
 func TestGetItems_EmptyBbox(t *testing.T) {
-	got := loadTestIndex(t).GetItems("castles", s2.EmptyRect())
+	got := loadTestIndex(t).GetItems("castles", 1000, s2.EmptyRect())
 	expectFeatureCollection(t, got, `{
 		"type": "FeatureCollection",
 		"features": []
 	}`)
 }
 
+func TestGetItems_LimitExceeded(t *testing.T) {
+	got := loadTestIndex(t).GetItems("castles", 2, s2.FullRect())
+	gotIDs := getFeatureIDs(got.Features)
+	expectedIDs := "N34729562,W418392510"
+	if !reflect.DeepEqual(gotIDs, expectedIDs) {
+		t.Errorf("expected %s, got %s", expectedIDs, gotIDs)
+		return
+	}
+	// TODO: Check got.Next
+}
+
 func TestGetItems_NoSuchCollection(t *testing.T) {
-	got := loadTestIndex(t).GetItems("no-such-collection", s2.FullRect())
+	got := loadTestIndex(t).GetItems("no-such-collection", 1000, s2.FullRect())
 	if got != nil {
 		t.Fatalf("expected nil, got %v", got)
 	}
+}
+
+func getFeatureIDs(f []*geojson.Feature) string {
+	ids := make([]string, len(f))
+	for i, feat := range f {
+		ids[i] = getIDString(feat.ID)
+	}
+	return strings.Join(ids, ",")
 }

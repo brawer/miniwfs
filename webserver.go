@@ -132,13 +132,25 @@ func (s *WebServer) handleListCollectionsRequest(w http.ResponseWriter, req *htt
 func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Request,
 	collection string) {
 	params := req.URL.Query()
+
+	limit := 10
+	limitParam := strings.TrimSpace(params.Get("limit"))
+	if len(limitParam) > 0 {
+		var err error
+		limit, err = strconv.Atoi(limitParam)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+
 	bbox, err := parseBbox(params.Get("bbox"))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	result := s.index.GetItems(collection, bbox)
+	result := s.index.GetItems(collection, limit, bbox)
 	if result == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
