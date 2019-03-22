@@ -55,8 +55,8 @@ func FormatItemsURL(prefix string, collection string,
 	if !bbox.IsFull() {
 		r := EncodeBbox(bbox)
 		if r != nil {
-				boxParam := fmt.Sprintf("bbox=%.7f,%.7f,%.7f,%.7f", r[0], r[1], r[2], r[3])
-				params = append(params, boxParam)
+			boxParam := fmt.Sprintf("bbox=%.7f,%.7f,%.7f,%.7f", r[0], r[1], r[2], r[3])
+			params = append(params, boxParam)
 		}
 	}
 	u := prefix + "collections/" + url.PathEscape(collection) + "/items"
