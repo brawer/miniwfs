@@ -39,3 +39,11 @@ func TestFormatItemsURL_DefaultParams(t *testing.T) {
 		t.Errorf("expected \"%s\", got \"%s\"", expected, got)
 	}
 }
+
+func TestFormatItemsURL_EmptyBbox(t *testing.T) {
+	got := FormatItemsURL("http://foo.org/bar/", "lakes", "", 0, DefaultLimit, s2.EmptyRect())
+	expected := "http://foo.org/bar/collections/lakes/items"
+	if expected != got {
+		t.Errorf("expected \"%s\", got \"%s\"", expected, got)
+	}
+}
