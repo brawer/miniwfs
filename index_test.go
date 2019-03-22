@@ -73,7 +73,7 @@ func TestGetItems_LimitExceeded(t *testing.T) {
 	links, _ := json.Marshal(got.Links)
 	expectJSON(t, string(links), `[
           {
-            "href": "https://test.example.org/wfs/collections/castles/items?start=W24785843\u0026limit=2",
+            "href": "https://test.example.org/wfs/collections/castles/items?startID=W24785843\u0026start=2\u0026limit=2",
             "rel": "next",
             "type": "application/geo+json",
             "title": "next"

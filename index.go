@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	//"fmt"
-	"html"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -95,8 +94,8 @@ func (index *Index) GetItems(collection string, limit int, bbox s2.Rect) *WFSFea
 
 	if limit < 1 {
 		limit = 1
-	} else if limit > 10000 {
-		limit = 10000
+	} else if limit > MaxLimit {
+		limit = MaxLimit
 	}
 
 	coll := index.Collections[collection]
@@ -112,6 +111,7 @@ func (index *Index) GetItems(collection string, limit int, bbox s2.Rect) *WFSFea
 	result.Features = make([]*geojson.Feature, 0, 50)
 	bounds := s2.EmptyRect()
 	var nextID string
+	var nextIndex int
 	for i, featureBounds := range coll.bbox {
 		if !bbox.Intersects(featureBounds) {
 			continue
@@ -120,41 +120,26 @@ func (index *Index) GetItems(collection string, limit int, bbox s2.Rect) *WFSFea
 		feature := coll.Features.Features[i]
 		if len(result.Features) >= limit {
 			nextID = getIDString(feature.ID)
+			nextIndex = i
 			break
 		}
 		result.Features = append(result.Features, feature)
 		bounds = bounds.Union(featureBounds)
 	}
 
-	if len(nextID) > 0 {
+	if nextIndex > 0 {
 		// TODO: Return nextID as part of result.
 		nextLink := &WFSLink{
 			Rel:   "next",
 			Title: "next",
 			Type:  "application/geo+json",
 		}
-		nextLink.Href = index.PublicPath.String() + "collections/" + html.EscapeString(collection) + "/items?start=" + html.EscapeString(nextID) + "&limit=" + strconv.Itoa(limit)
-		// TODO: Omit limit if it has default value
-		// TODO: also add bbox param, unless it is entire world
+		nextLink.Href = FormatItemsURL(index.PublicPath.String(), collection, nextID, nextIndex, limit, bbox)
 		result.Links = append(result.Links, nextLink)
 	}
 
-	result.BoundingBox = encodeBbox(bounds)
+	result.BoundingBox = EncodeBbox(bounds)
 	return result
-}
-
-func encodeBbox(r s2.Rect) []float64 {
-	if r.IsEmpty() {
-		return nil
-	} else {
-		bbox := [4]float64{
-			r.Lo().Lng.Degrees(),
-			r.Lo().Lat.Degrees(),
-			r.Hi().Lng.Degrees(),
-			r.Hi().Lat.Degrees(),
-		}
-		return bbox[0:4]
-	}
 }
 
 func (index *Index) watchFiles() {

@@ -121,7 +121,7 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 	collection string) {
 	params := req.URL.Query()
 
-	limit := 10
+	limit := DefaultLimit
 	limitParam := strings.TrimSpace(params.Get("limit"))
 	if len(limitParam) > 0 {
 		var err error
