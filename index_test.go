@@ -55,7 +55,7 @@ func TestGetItem_NoSuchItem(t *testing.T) {
 }
 
 func TestGetItems_EmptyBbox(t *testing.T) {
-	got := loadTestIndex(t).GetItems("castles", DefaultLimit, s2.EmptyRect())
+	got := loadTestIndex(t).GetItems("castles", "", 0, DefaultLimit, s2.EmptyRect())
 	expectFeatureCollection(t, got, `{
 		"type": "FeatureCollection",
 		"links": [{
@@ -69,7 +69,7 @@ func TestGetItems_EmptyBbox(t *testing.T) {
 }
 
 func TestGetItems_LimitExceeded(t *testing.T) {
-	got := loadTestIndex(t).GetItems("castles", 2, s2.FullRect())
+	got := loadTestIndex(t).GetItems("castles", "", 0, 2, s2.FullRect())
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "N34729562,W418392510"
 	if !reflect.DeepEqual(gotIDs, expectedIDs) {
@@ -94,7 +94,7 @@ func TestGetItems_LimitExceeded(t *testing.T) {
 }
 
 func TestGetItems_NoSuchCollection(t *testing.T) {
-	got := loadTestIndex(t).GetItems("no-such-collection", 1000, s2.FullRect())
+	got := loadTestIndex(t).GetItems("no-such-collection", "", 0, DefaultLimit, s2.FullRect())
 	if got != nil {
 		t.Fatalf("expected nil, got %v", got)
 	}

@@ -88,9 +88,14 @@ func (index *Index) GetItem(collection string, id string) *geojson.Feature {
 	}
 }
 
-func (index *Index) GetItems(collection string, limit int, bbox s2.Rect) *WFSFeatureCollection {
+func (index *Index) GetItems(collection string, startID string, startIndex int, limit int, bbox s2.Rect) *WFSFeatureCollection {
 	index.mutex.RLock()
 	defer index.mutex.RUnlock()
+
+	coll := index.Collections[collection]
+	if coll == nil {
+		return nil
+	}
 
 	if limit < 1 {
 		limit = 1
@@ -98,12 +103,14 @@ func (index *Index) GetItems(collection string, limit int, bbox s2.Rect) *WFSFea
 		limit = MaxLimit
 	}
 
-	startIndex := 0 // TODO
-	startID := ""   // TODO
+	if len(startID) > 0 {
+		if i, ok := coll.byID[startID]; ok {
+			startIndex = i
+		}
+	}
 
-	coll := index.Collections[collection]
-	if coll == nil {
-		return nil
+	if startIndex < 0 {
+		startIndex = 0
 	}
 
 	// If we had more data, we could compute s2 cell coverages and only

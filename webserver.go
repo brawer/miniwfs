@@ -121,6 +121,19 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 	collection string) {
 	params := req.URL.Query()
 
+	start := 0
+	startParam := strings.TrimSpace(params.Get("start"))
+	if len(startParam) > 0 {
+		var err error
+		start, err = strconv.Atoi(startParam)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+
+	startID := params.Get("startID")
+
 	limit := DefaultLimit
 	limitParam := strings.TrimSpace(params.Get("limit"))
 	if len(limitParam) > 0 {
@@ -138,7 +151,7 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	result := s.index.GetItems(collection, limit, bbox)
+	result := s.index.GetItems(collection, startID, start, limit, bbox)
 	if result == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
