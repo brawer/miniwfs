@@ -55,9 +55,15 @@ func TestGetItem_NoSuchItem(t *testing.T) {
 }
 
 func TestGetItems_EmptyBbox(t *testing.T) {
-	got := loadTestIndex(t).GetItems("castles", 1000, s2.EmptyRect())
+	got := loadTestIndex(t).GetItems("castles", DefaultLimit, s2.EmptyRect())
 	expectFeatureCollection(t, got, `{
 		"type": "FeatureCollection",
+		"links": [{
+			"href": "https://test.example.org/wfs/collections/castles/items",
+			"rel": "self",
+			"type": "application/geo+json",
+			"title": "self"
+		}],
 		"features": []
 	}`)
 }
@@ -72,6 +78,12 @@ func TestGetItems_LimitExceeded(t *testing.T) {
 	}
 	links, _ := json.Marshal(got.Links)
 	expectJSON(t, string(links), `[
+          {
+            "href": "https://test.example.org/wfs/collections/castles/items?limit=2",
+            "rel": "self",
+            "type": "application/geo+json",
+            "title": "self"
+          },
           {
             "href": "https://test.example.org/wfs/collections/castles/items?startID=W24785843\u0026start=2\u0026limit=2",
             "rel": "next",

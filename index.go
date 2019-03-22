@@ -98,6 +98,9 @@ func (index *Index) GetItems(collection string, limit int, bbox s2.Rect) *WFSFea
 		limit = MaxLimit
 	}
 
+	startIndex := 0 // TODO
+	startID := ""   // TODO
+
 	coll := index.Collections[collection]
 	if coll == nil {
 		return nil
@@ -127,14 +130,23 @@ func (index *Index) GetItems(collection string, limit int, bbox s2.Rect) *WFSFea
 		bounds = bounds.Union(featureBounds)
 	}
 
+	pathPrefix := index.PublicPath.String()
+	selfLink := &WFSLink{
+		Rel:   "self",
+		Title: "self",
+		Type:  "application/geo+json",
+	}
+
+	selfLink.Href = FormatItemsURL(pathPrefix, collection, startID, startIndex, limit, bbox)
+	result.Links = append(result.Links, selfLink)
+
 	if nextIndex > 0 {
-		// TODO: Return nextID as part of result.
 		nextLink := &WFSLink{
 			Rel:   "next",
 			Title: "next",
 			Type:  "application/geo+json",
 		}
-		nextLink.Href = FormatItemsURL(index.PublicPath.String(), collection, nextID, nextIndex, limit, bbox)
+		nextLink.Href = FormatItemsURL(pathPrefix, collection, nextID, nextIndex, limit, bbox)
 		result.Links = append(result.Links, nextLink)
 	}
 

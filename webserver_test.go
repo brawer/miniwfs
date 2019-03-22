@@ -178,6 +178,14 @@ func TestCollection(t *testing.T) {
 	expectCORSHeader(t, resp.Header())
 	expectJSON(t, getBody(resp), `{
           "type": "FeatureCollection",
+          "links": [
+            {
+              "href": "https://test.example.org/wfs/collections/castles/items?bbox=11.1834670,47.9104130,11.1834690,47.9104150",
+              "rel": "self",
+              "type": "application/geo+json",
+              "title": "self"
+            }
+          ],
           "bbox": [
             11.183468,
             47.910414,
