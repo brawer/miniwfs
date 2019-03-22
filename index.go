@@ -88,6 +88,10 @@ func (index *Index) GetItem(collection string, id string) *geojson.Feature {
 	}
 }
 
+// We take both startID and startIndex to be more resilient when our
+// data changes while a client is iterating over paged results. If
+// startID is a known ID, we start the iteration there; otherwise, we
+// start the iteration at the feature whose index is startIndex.
 func (index *Index) GetItems(collection string, startID string, startIndex int, limit int, bbox s2.Rect) *WFSFeatureCollection {
 	index.mutex.RLock()
 	defer index.mutex.RUnlock()
@@ -117,25 +121,32 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 	// check the intersection for features inside the coverage area.
 	// But we operate on a few thousand features, so let's keep things simple
 	// for the time being.
-	result := &WFSFeatureCollection{Type: "FeatureCollection"}
-	result.Features = make([]*geojson.Feature, 0, 50)
+	features := make([]*geojson.Feature, 0, limit)
 	bounds := s2.EmptyRect()
 	var nextID string
 	var nextIndex int
+	skip := startIndex
 	for i, featureBounds := range coll.bbox {
 		if !bbox.Intersects(featureBounds) {
 			continue
 		}
 
 		feature := coll.Features.Features[i]
-		if len(result.Features) >= limit {
+		if len(features) >= limit {
 			nextID = getIDString(feature.ID)
 			nextIndex = i
 			break
 		}
-		result.Features = append(result.Features, feature)
+		if skip > 0 {
+			skip = skip - 1
+			continue
+		}
+		features = append(features, feature)
 		bounds = bounds.Union(featureBounds)
 	}
+
+	result := &WFSFeatureCollection{Type: "FeatureCollection"}
+	result.Features = features
 
 	pathPrefix := index.PublicPath.String()
 	selfLink := &WFSLink{
@@ -146,6 +157,7 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 
 	selfLink.Href = FormatItemsURL(pathPrefix, collection, startID, startIndex, limit, bbox)
 	result.Links = append(result.Links, selfLink)
+	result.BoundingBox = EncodeBbox(bounds)
 
 	if nextIndex > 0 {
 		nextLink := &WFSLink{
@@ -157,7 +169,6 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 		result.Links = append(result.Links, nextLink)
 	}
 
-	result.BoundingBox = EncodeBbox(bounds)
 	return result
 }
 

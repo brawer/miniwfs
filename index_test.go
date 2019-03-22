@@ -68,11 +68,70 @@ func TestGetItems_EmptyBbox(t *testing.T) {
 	}`)
 }
 
+func TestGetItems_KnownStartID(t *testing.T) {
+	// startID=W418392510 is a known ID (of feature #1)
+	// start=77 should be ignored when startID is a known ID
+	got := loadTestIndex(t).GetItems("castles", "W418392510", 77, 2, s2.FullRect())
+	gotIDs := getFeatureIDs(got.Features)
+	expectedIDs := "W418392510,W24785843"
+	if expectedIDs != gotIDs {
+		t.Errorf("expected %s, got %s", expectedIDs, gotIDs)
+		return
+	}
+	links, _ := json.Marshal(got.Links)
+	expectJSON(t, string(links), `[
+          {
+            "href": "https://test.example.org/wfs/collections/castles/items?startID=W418392510\u0026start=1\u0026limit=2",
+            "rel": "self",
+            "type": "application/geo+json",
+            "title": "self"
+          }
+        ]`)
+}
+
+func TestGetItems_UnknownStartID(t *testing.T) {
+	got := loadTestIndex(t).GetItems("castles", "UnknownID", 2, 2, s2.FullRect())
+	gotIDs := getFeatureIDs(got.Features)
+	expectedIDs := "W24785843"
+	if expectedIDs != gotIDs {
+		t.Errorf("expected %s, got %s", expectedIDs, gotIDs)
+		return
+	}
+	links, _ := json.Marshal(got.Links)
+	expectJSON(t, string(links), `[
+          {
+            "href": "https://test.example.org/wfs/collections/castles/items?startID=UnknownID\u0026start=2\u0026limit=2",
+            "rel": "self",
+            "type": "application/geo+json",
+            "title": "self"
+          }
+        ]`)
+}
+
+func TestGetItems_NoStartID(t *testing.T) {
+	got := loadTestIndex(t).GetItems("castles", "", 2, 2, s2.FullRect())
+	gotIDs := getFeatureIDs(got.Features)
+	expectedIDs := "W24785843"
+	if expectedIDs != gotIDs {
+		t.Errorf("expected %s, got %s", expectedIDs, gotIDs)
+		return
+	}
+	links, _ := json.Marshal(got.Links)
+	expectJSON(t, string(links), `[
+          {
+            "href": "https://test.example.org/wfs/collections/castles/items?start=2\u0026limit=2",
+            "rel": "self",
+            "type": "application/geo+json",
+            "title": "self"
+          }
+        ]`)
+}
+
 func TestGetItems_LimitExceeded(t *testing.T) {
 	got := loadTestIndex(t).GetItems("castles", "", 0, 2, s2.FullRect())
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "N34729562,W418392510"
-	if !reflect.DeepEqual(gotIDs, expectedIDs) {
+	if expectedIDs != gotIDs {
 		t.Errorf("expected %s, got %s", expectedIDs, gotIDs)
 		return
 	}
