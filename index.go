@@ -9,7 +9,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/geo/s2"
@@ -35,16 +37,21 @@ type Collection struct {
 var (
 	lastDataLoad = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "miniwfs_data_load_timestamp",
-		Help: "The timestamp when data was last loaded, in seconds since the Unix epoch",
+		Help: "Timestamp when data was last loaded, in seconds since the Unix epoch.",
 	})
 	numDataLoads = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "miniwfs_data_loads_total",
-		Help: "The total number of data loads",
+		Help: "Total number of data loads.",
 	})
 	numDataLoadErrors = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "miniwfs_data_load_errors_total",
-		Help: "The total number of errors when loading data",
+		Help: "Total number of errors when loading data.",
 	})
+	collectionTimestamp = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "miniwfs_collection_timestamp",
+		Help: "Timestamp of the collection, in seconds since the Unix epoch.",
+	},
+		[]string{"collection", "stage"})
 )
 
 func MakeIndex(collections map[string]string, publicPath *url.URL) (*Index, error) {
@@ -61,7 +68,7 @@ func MakeIndex(collections map[string]string, publicPath *url.URL) (*Index, erro
 
 	go index.watchFiles()
 	for name, path := range collections {
-		coll, err := readCollection(path)
+		coll, err := readCollection(name, path)
 		if err != nil {
 			return nil, err
 		}
@@ -198,15 +205,29 @@ func (index *Index) watchFiles() {
 				return
 			}
 			if event.Op&fsnotify.Write == fsnotify.Write {
-				if coll, err := readCollection(event.Name); err == nil {
+				path := event.Name
+				name := index.getCollectionNameForPath(path)
+				if coll, err := readCollection(name, path); err == nil {
 					index.replaceCollection(coll)
 				} else {
-					log.Printf("error reading collection %s: %v",
-						event.Name, err)
+					log.Printf("error reading collection %s at %s: %v",
+						name, path, err)
 				}
 			}
 		}
 	}
+}
+
+func (index *Index) getCollectionNameForPath(path string) string {
+	index.mutex.Lock()
+	defer index.mutex.Unlock()
+
+	for name, c := range index.Collections {
+		if path == c.Path {
+			return name
+		}
+	}
+	return ""
 }
 
 func (index *Index) replaceCollection(c *Collection) {
@@ -220,7 +241,7 @@ func (index *Index) replaceCollection(c *Collection) {
 	}
 }
 
-func readCollection(path string) (*Collection, error) {
+func readCollection(name, path string) (*Collection, error) {
 	lastDataLoad.SetToCurrentTime()
 	numDataLoads.Inc()
 
@@ -266,6 +287,30 @@ func readCollection(path string) (*Collection, error) {
 			byID[id] = i
 		}
 	}
+
+	// RFC 7946 does not define a "properties" member on FeatureCollection,
+	// only on Feature. We still recognize certain collection properties,
+	// which is is allowed as per RFC 7946 section 6.1 (Foreign Members).
+	type collectionProperties struct {
+		Properties map[string]interface{} `json:"properties"`
+	}
+	var props collectionProperties
+	if err := json.Unmarshal(data, &props); err == nil {
+		for prop, val := range props.Properties {
+			if strings.HasSuffix(prop, "_timestamp") {
+				if s, ok := val.(string); ok {
+					if t, err := time.Parse(time.RFC3339, s); err == nil {
+						propName := strings.TrimSuffix(prop, "_timestamp")
+						if len(propName) > 0 {
+							collectionTimestamp.WithLabelValues(name, propName).Set(float64(t.UTC().Unix()))
+
+						}
+					}
+				}
+			}
+		}
+	}
+	collectionTimestamp.WithLabelValues(name, "loaded").Set(float64(time.Now().UTC().Unix()))
 
 	return coll, nil
 }

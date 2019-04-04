@@ -37,5 +37,8 @@
 			"name":"Palazzo Pretorio",
 			"wikidata":"Q26997946"
 		}
-	}]
+	}],
+	"properties": {
+		"osm_base_timestamp": "2019-04-04T16:09:03Z"
+	}
 }

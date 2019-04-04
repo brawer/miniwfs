@@ -7,9 +7,11 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/geo/s2"
 	"github.com/paulmach/go.geojson"
+	promtest "github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func loadTestIndex(t *testing.T) *Index {
@@ -156,6 +158,23 @@ func TestGetItems_NoSuchCollection(t *testing.T) {
 	got := loadTestIndex(t).GetItems("no-such-collection", "", 0, DefaultLimit, s2.FullRect())
 	if got != nil {
 		t.Fatalf("expected nil, got %v", got)
+	}
+}
+
+func TestReadCollection_CollectionTimestamp(t *testing.T) {
+	loadTestIndex(t)
+	expected := "2019-04-04T16:09:03Z"
+	m, _ := collectionTimestamp.GetMetricWithLabelValues("castles", "osm_base")
+	osmBase := time.Unix(int64(promtest.ToFloat64(m)), 0).UTC().Format(time.RFC3339)
+	if osmBase != expected {
+		t.Fatalf("expected timestamp %s for castles/osm_base, got %s", expected, osmBase)
+	}
+
+	m, _ = collectionTimestamp.GetMetricWithLabelValues("castles", "loaded")
+	loaded := time.Unix(int64(promtest.ToFloat64(m)), 0).UTC()
+	delta := time.Since(loaded)
+	if delta.Seconds() > 10.0 {
+		t.Fatalf("expected timestamp for castles/loaded within 10s from now, got %s", delta)
 	}
 }
 
