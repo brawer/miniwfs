@@ -14,6 +14,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/geo/s2"
 	"github.com/paulmach/go.geojson"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type Index struct {
@@ -29,6 +31,21 @@ type Collection struct {
 	Path     string
 	byID     map[string]int // "W77" -> 3 if Features[3].ID == "W77"
 }
+
+var (
+	lastDataLoad = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "miniwfs_data_load_timestamp",
+		Help: "The timestamp when data was last loaded, in seconds since the Unix epoch",
+	})
+	numDataLoads = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "miniwfs_data_loads_total",
+		Help: "The total number of data loads",
+	})
+	numDataLoadErrors = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "miniwfs_data_load_errors_total",
+		Help: "The total number of errors when loading data",
+	})
+)
 
 func MakeIndex(collections map[string]string, publicPath *url.URL) (*Index, error) {
 	index := &Index{
@@ -176,6 +193,7 @@ func (index *Index) watchFiles() {
 	for {
 		select {
 		case event, ok := <-index.watcher.Events:
+			log.Printf("Watcher event: %v\n", event)
 			if !ok {
 				return
 			}
@@ -203,18 +221,24 @@ func (index *Index) replaceCollection(c *Collection) {
 }
 
 func readCollection(path string) (*Collection, error) {
+	lastDataLoad.SetToCurrentTime()
+	numDataLoads.Inc()
+
 	absPath, err := filepath.Abs(path)
 	if err != nil {
+		numDataLoadErrors.Inc()
 		return nil, err
 	}
 
 	data, err := ioutil.ReadFile(absPath)
 	if err != nil {
+		numDataLoadErrors.Inc()
 		return nil, err
 	}
 
 	coll := &Collection{Path: absPath}
 	if err := json.Unmarshal(data, &coll.Features); err != nil {
+		numDataLoadErrors.Inc()
 		return nil, err
 	}
 
