@@ -47,6 +47,11 @@ var (
 		Name: "miniwfs_data_load_errors_total",
 		Help: "Total number of errors when loading data.",
 	})
+	collectionFeaturesCount = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "miniwfs_collection_features",
+		Help: "Number of features per collection.",
+	},
+		[]string{"collection"})
 	collectionTimestamp = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "miniwfs_collection_timestamp",
 		Help: "Timestamp of the collection, in seconds since the Unix epoch.",
@@ -311,6 +316,7 @@ func readCollection(name, path string) (*Collection, error) {
 		}
 	}
 	collectionTimestamp.WithLabelValues(name, "loaded").Set(float64(time.Now().UTC().Unix()))
+	collectionFeaturesCount.WithLabelValues(name).Set(float64(len(coll.Features.Features)))
 
 	return coll, nil
 }

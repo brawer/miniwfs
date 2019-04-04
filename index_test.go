@@ -161,10 +161,16 @@ func TestGetItems_NoSuchCollection(t *testing.T) {
 	}
 }
 
-func TestReadCollection_CollectionTimestamp(t *testing.T) {
+func TestReadCollection_CollectionMetrics(t *testing.T) {
 	loadTestIndex(t)
+
+	m, _ := collectionFeaturesCount.GetMetricWithLabelValues("castles")
+	if promtest.ToFloat64(m) != 3 {
+		t.Fatalf("expected collectionFeaturesCount == 3 for castles, got %v", promtest.ToFloat64(m))
+	}
+
 	expected := "2019-04-04T16:09:03Z"
-	m, _ := collectionTimestamp.GetMetricWithLabelValues("castles", "osm_base")
+	m, _ = collectionTimestamp.GetMetricWithLabelValues("castles", "osm_base")
 	osmBase := time.Unix(int64(promtest.ToFloat64(m)), 0).UTC().Format(time.RFC3339)
 	if osmBase != expected {
 		t.Fatalf("expected timestamp %s for castles/osm_base, got %s", expected, osmBase)
