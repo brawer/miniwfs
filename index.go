@@ -81,7 +81,8 @@ func MakeIndex(collections map[string]string, publicPath *url.URL) (*Index, erro
 	}
 
 	for _, c := range index.Collections {
-		if err := index.watcher.Add(c.Path); err != nil {
+		dirPath := c.Path[:strings.LastIndex(c.Path, "/")]
+		if err := index.watcher.Add(dirPath); err != nil {
 			return nil, err
 		}
 	}
@@ -201,6 +202,31 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 	return result
 }
 
+func (index *Index) watchFiles() {
+	for {
+		select {
+		case event, ok := <-index.watcher.Events:
+			log.Printf("Watcher event: %v\n", event)
+			if !ok {
+				return
+			}
+			if event.Op&fsnotify.Write == fsnotify.Write {
+				path := event.Name
+				name := index.getCollectionNameForPath(path)
+				if name != "" {
+					if coll, err := readCollection(name, path); err == nil {
+						log.Printf("success reading collection %s from %s", name, path)
+						index.replaceCollection(coll)
+					} else {
+						log.Printf("error reading collection %s at %s: %v",
+							name, path, err)
+					}
+				}
+			}
+		}
+	}
+}
+
 func (index *Index) getCollectionNameForPath(path string) string {
 	index.mutex.Lock()
 	defer index.mutex.Unlock()
@@ -211,53 +237,6 @@ func (index *Index) getCollectionNameForPath(path string) string {
 		}
 	}
 	return ""
-}
-
-func (index *Index) watchFiles() {
-	for {
-		select {
-		case event, ok := <-index.watcher.Events:
-			log.Printf("Watcher event: %v\n", event)
-			if !ok {
-				return
-			}
-
-			// On some systems, we only see a REMOVE and CHMOD
-			// but never a WRITE operation. We therefore try
-			// reloading a few times.
-			// https://github.com/fsnotify/fsnotify/issues/92
-			path := event.Name
-			name := index.getCollectionNameForPath(path)
-			go index.reloadCollectionAfterWatchEvent(name, path)
-		}
-	}
-}
-
-// To work around kernels with unreliable file system events,
-// we do a few attempts at re-reading the file whenever we
-// get _any_ event for the file. This is not a great solution,
-// but due to the structure of GeoJSON, decoding will fail until
-// we've seen a complete version of the file. As an improvement,
-// we could fingerprint the file contents, and at least skip those
-// re-reads from parallel goroutines that were spawned by watching
-// file operations that don't actually change the content (such
-// as CHMOD).
-// https://github.com/fsnotify/fsnotify/issues/92
-func (index *Index) reloadCollectionAfterWatchEvent(name string, path string) {
-	numAttempts := 1
-	for numAttempts < 10 {
-		if coll, err := readCollection(name, path); err == nil {
-			log.Printf("success reading collection %s from %s in attempt: %d", name, path, numAttempts)
-			index.replaceCollection(coll)
-			return
-		} else {
-			log.Printf("error reading collection %s from %s: %v, attempt: %d",
-				name, path, err, numAttempts)
-		}
-		time.Sleep(time.Duration(numAttempts*10) * time.Second) // give some time for writing process to finish
-	}
-	log.Printf("giving up reading collection %s from %s after %d failed attempts",
-		name, path, numAttempts)
 }
 
 func (index *Index) replaceCollection(c *Collection) {
