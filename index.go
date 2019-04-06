@@ -210,7 +210,7 @@ func (index *Index) watchFiles() {
 			if !ok {
 				return
 			}
-			if event.Op&fsnotify.Write == fsnotify.Write {
+			if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
 				path := event.Name
 				name := index.getCollectionNameForPath(path)
 				if name != "" {
