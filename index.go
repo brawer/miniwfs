@@ -81,7 +81,8 @@ func MakeIndex(collections map[string]string, publicPath *url.URL) (*Index, erro
 	}
 
 	for _, c := range index.Collections {
-		if err := index.watcher.Add(c.Path); err != nil {
+		dirPath := c.Path[:strings.LastIndex(c.Path, "/")]
+		if err := index.watcher.Add(dirPath); err != nil {
 			return nil, err
 		}
 	}
@@ -212,11 +213,13 @@ func (index *Index) watchFiles() {
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				path := event.Name
 				name := index.getCollectionNameForPath(path)
-				if coll, err := readCollection(name, path); err == nil {
-					index.replaceCollection(coll)
-				} else {
-					log.Printf("error reading collection %s at %s: %v",
-						name, path, err)
+				if name != "" {
+					if coll, err := readCollection(name, path); err == nil {
+						index.replaceCollection(coll)
+					} else {
+						log.Printf("error reading collection %s at %s: %v",
+							name, path, err)
+					}
 				}
 			}
 		}
