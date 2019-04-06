@@ -215,6 +215,7 @@ func (index *Index) watchFiles() {
 				name := index.getCollectionNameForPath(path)
 				if name != "" {
 					if coll, err := readCollection(name, path); err == nil {
+						log.Printf("success reading collection %s from %s", name, path)
 						index.replaceCollection(coll)
 					} else {
 						log.Printf("error reading collection %s at %s: %v",
