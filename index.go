@@ -31,6 +31,7 @@ type Index struct {
 
 type CollectionMetadata struct {
 	Name         string
+	Path         string
 	LastModified time.Time
 }
 
@@ -38,7 +39,6 @@ type Collection struct {
 	metadata CollectionMetadata
 	Features geojson.FeatureCollection
 	bbox     []s2.Rect
-	Path     string
 	byID     map[string]int // "W77" -> 3 if Features[3].ID == "W77"
 }
 
@@ -90,7 +90,7 @@ func MakeIndex(collections map[string]string, publicPath *url.URL) (*Index, erro
 	}
 
 	for _, c := range index.Collections {
-		dirPath := c.Path[:strings.LastIndex(c.Path, "/")]
+		dirPath := c.metadata.Path[:strings.LastIndex(c.metadata.Path, "/")]
 		if err := index.watcher.Add(dirPath); err != nil {
 			return nil, err
 		}
@@ -242,7 +242,7 @@ func (index *Index) getCollectionMetadata(path string) *CollectionMetadata {
 	defer index.mutex.Unlock()
 
 	for _, c := range index.Collections {
-		if path == c.Path {
+		if path == c.metadata.Path {
 			return &c.metadata
 		}
 	}
@@ -252,12 +252,7 @@ func (index *Index) getCollectionMetadata(path string) *CollectionMetadata {
 func (index *Index) replaceCollection(c *Collection) {
 	index.mutex.Lock()
 	defer index.mutex.Unlock()
-
-	for name, old := range index.Collections {
-		if c.Path == old.Path {
-			index.Collections[name] = c
-		}
-	}
+	index.Collections[c.metadata.Name] = c
 }
 
 var NotModified error = errors.New("FeatureCollection not modified")
@@ -286,9 +281,10 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 		return nil, err
 	}
 
-	coll := &Collection{Path: absPath}
+	coll := &Collection{}
 	coll.metadata.LastModified = stat.ModTime()
 	coll.metadata.Name = name
+	coll.metadata.Path = absPath
 
 	if err := json.Unmarshal(data, &coll.Features); err != nil {
 		numDataLoadErrors.Inc()
