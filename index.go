@@ -264,9 +264,6 @@ var NotModified error = errors.New("FeatureCollection not modified")
 
 // Returns NotModified if the collection has not been modfied since time ifModifiedSince.
 func readCollection(name string, path string, ifModifiedSince time.Time) (*Collection, error) {
-	lastDataLoad.SetToCurrentTime()
-	numDataLoads.Inc()
-
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		numDataLoadErrors.Inc()
@@ -345,6 +342,9 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 			}
 		}
 	}
+
+	lastDataLoad.SetToCurrentTime()
+	numDataLoads.Inc()
 	collectionTimestamp.WithLabelValues(name, "last_modified").Set(float64(coll.metadata.LastModified.UTC().Unix()))
 	collectionTimestamp.WithLabelValues(name, "loaded").Set(float64(time.Now().UTC().Unix()))
 	collectionFeaturesCount.WithLabelValues(name).Set(float64(len(coll.Features.Features)))
