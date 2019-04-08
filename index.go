@@ -90,7 +90,7 @@ func MakeIndex(collections map[string]string, publicPath *url.URL) (*Index, erro
 	}
 
 	for _, c := range index.Collections {
-		dirPath := c.metadata.Path[:strings.LastIndex(c.metadata.Path, "/")]
+		dirPath := filepath.Dir(c.metadata.Path)
 		if err := index.watcher.Add(dirPath); err != nil {
 			return nil, err
 		}
