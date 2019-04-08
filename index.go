@@ -212,8 +212,18 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 }
 
 func (index *Index) watchFiles() {
+	// We watch the local file system for changes so we quickly catch modifications.
+	// Additionally, we check once per minute if the files have changed because
+	// file system watching has not been very reliable in our experience.
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
 	for {
 		select {
+		case <-ticker.C:
+			for _, md := range index.GetCollections() {
+				index.reloadIfChanged(md)
+			}
+
 		case event, ok := <-index.watcher.Events:
 			log.Printf("Watcher event: %v\n", event)
 			if !ok {
@@ -225,15 +235,22 @@ func (index *Index) watchFiles() {
 			path := event.Name
 			md := index.getCollectionMetadata(path)
 			if md != nil {
-				if coll, err := readCollection(md.Name, path, md.LastModified); err == nil {
-					log.Printf("success reading collection %s from %s", md.Name, path)
-					index.replaceCollection(coll)
-				} else {
-					log.Printf("error reading collection %s at %s: %v",
-						md.Name, path, err)
-				}
+				index.reloadIfChanged(*md)
 			}
 		}
+	}
+}
+
+func (index *Index) reloadIfChanged(md CollectionMetadata) {
+	if coll, err := readCollection(md.Name, md.Path, md.LastModified); err == nil {
+		log.Printf("success reading collection %s from %s", md.Name, md.Path)
+		index.replaceCollection(coll)
+	} else if err == NotModified {
+		log.Printf("no change in collection %s at %s",
+			md.Name, md.Path)
+	} else {
+		log.Printf("error reading collection %s at %s: %v",
+			md.Name, md.Path, err)
 	}
 }
 
