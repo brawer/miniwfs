@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/url"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -31,6 +32,7 @@ type Collection struct {
 	Features geojson.FeatureCollection
 	bbox     []s2.Rect
 	Path     string
+	lastMod  time.Time
 	byID     map[string]int // "W77" -> 3 if Features[3].ID == "W77"
 }
 
@@ -260,13 +262,19 @@ func readCollection(name, path string) (*Collection, error) {
 		return nil, err
 	}
 
+	stat, err := os.Stat(absPath)
+	if err != nil {
+		numDataLoadErrors.Inc()
+		return nil, err
+	}
+
 	data, err := ioutil.ReadFile(absPath)
 	if err != nil {
 		numDataLoadErrors.Inc()
 		return nil, err
 	}
 
-	coll := &Collection{Path: absPath}
+	coll := &Collection{Path: absPath, lastMod: stat.ModTime()}
 	if err := json.Unmarshal(data, &coll.Features); err != nil {
 		numDataLoadErrors.Inc()
 		return nil, err
@@ -319,6 +327,7 @@ func readCollection(name, path string) (*Collection, error) {
 			}
 		}
 	}
+	collectionTimestamp.WithLabelValues(name, "last_modified").Set(float64(coll.lastMod.UTC().Unix()))
 	collectionTimestamp.WithLabelValues(name, "loaded").Set(float64(time.Now().UTC().Unix()))
 	collectionFeaturesCount.WithLabelValues(name).Set(float64(len(coll.Features.Features)))
 

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/url"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -174,6 +175,14 @@ func TestReadCollection_CollectionMetrics(t *testing.T) {
 	osmBase := time.Unix(int64(promtest.ToFloat64(m)), 0).UTC().Format(time.RFC3339)
 	if osmBase != expected {
 		t.Fatalf("expected timestamp %s for castles/osm_base, got %s", expected, osmBase)
+	}
+
+	m, _ = collectionTimestamp.GetMetricWithLabelValues("castles", "last_modified")
+	lastMod := time.Unix(int64(promtest.ToFloat64(m)), 0).UTC().Format(time.RFC3339)
+	stat, _ := os.Stat(filepath.Join("testdata", "castles.geojson"))
+	expected = stat.ModTime().UTC().Format(time.RFC3339)
+	if lastMod != expected {
+		t.Errorf("expected timestamp %s for castles/last_modified, got %s", expected, lastMod)
 	}
 
 	m, _ = collectionTimestamp.GetMetricWithLabelValues("castles", "loaded")
