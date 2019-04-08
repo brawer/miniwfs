@@ -2,4 +2,4 @@
 
 # MiniWFS
 
-Minitature WFS3 implementation that serves out the contents of GeoJSON files loaded from local disk. Experimental prototype, not yet ready for production.
+Miniature WFS3 implementation that serves out the contents of GeoJSON files loaded from local disk. Experimental prototype, not yet ready for production.
