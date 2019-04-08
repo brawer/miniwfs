@@ -30,7 +30,11 @@ func loadTestIndex(t *testing.T) *Index {
 }
 
 func TestGetCollections(t *testing.T) {
-	got := loadTestIndex(t).GetCollections()
+	colls := loadTestIndex(t).GetCollections()
+	got := make([]string, len(colls))
+	for i, c := range colls {
+		got[i] = c.Name
+	}
 	expected := []string{"castles", "lakes"}
 	if !reflect.DeepEqual(got, expected) {
 		t.Fatalf("expected %v, got %v", expected, got)

@@ -99,16 +99,16 @@ func MakeIndex(collections map[string]string, publicPath *url.URL) (*Index, erro
 	return index, nil
 }
 
-func (index *Index) GetCollections() []string {
+func (index *Index) GetCollections() []CollectionMetadata {
 	index.mutex.RLock()
 	defer index.mutex.RUnlock()
 
-	result := make([]string, 0, len(index.Collections))
-	for name, _ := range index.Collections {
-		result = append(result, name)
+	md := make([]CollectionMetadata, 0, len(index.Collections))
+	for _, coll := range index.Collections {
+		md = append(md, coll.metadata)
 	}
-	sort.Strings(result)
-	return result
+	sort.Slice(md, func(i, j int) bool { return md[i].Name < md[j].Name })
+	return md
 }
 
 func (index *Index) GetItem(collection string, id string) *geojson.Feature {

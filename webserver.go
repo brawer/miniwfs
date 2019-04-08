@@ -83,14 +83,14 @@ func (s *WebServer) handleListCollectionsRequest(w http.ResponseWriter, req *htt
 
 	collections := s.index.GetCollections()
 	wfsCollections := make([]WFSCollection, 0, len(collections))
-	for _, name := range collections {
+	for _, c := range collections {
 		link := WFSLink{
-			Href:  s.index.PublicPath.String() + "collections/" + name,
+			Href:  s.index.PublicPath.String() + "collections/" + c.Name,
 			Rel:   "item",
 			Type:  "application/geo+json",
-			Title: name,
+			Title: c.Name,
 		}
-		wfsColl := WFSCollection{Name: name, Links: []WFSLink{link}}
+		wfsColl := WFSCollection{Name: c.Name, Links: []WFSLink{link}}
 		wfsCollections = append(wfsCollections, wfsColl)
 	}
 
