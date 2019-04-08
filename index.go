@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	//"fmt"
 	"io/ioutil"
 	"log"
@@ -80,7 +81,8 @@ func MakeIndex(collections map[string]string, publicPath *url.URL) (*Index, erro
 
 	go index.watchFiles()
 	for name, path := range collections {
-		coll, err := readCollection(name, path)
+		var t0 time.Time // The zero value of type Time is January 1, year 1.
+		coll, err := readCollection(name, path, t0)
 		if err != nil {
 			return nil, err
 		}
@@ -223,7 +225,7 @@ func (index *Index) watchFiles() {
 			path := event.Name
 			md := index.getCollectionMetadata(path)
 			if md != nil {
-				if coll, err := readCollection(md.Name, path); err == nil {
+				if coll, err := readCollection(md.Name, path, md.LastModified); err == nil {
 					log.Printf("success reading collection %s from %s", md.Name, path)
 					index.replaceCollection(coll)
 				} else {
@@ -258,7 +260,10 @@ func (index *Index) replaceCollection(c *Collection) {
 	}
 }
 
-func readCollection(name, path string) (*Collection, error) {
+var NotModified error = errors.New("FeatureCollection not modified")
+
+// Returns NotModified if the collection has not been modfied since time ifModifiedSince.
+func readCollection(name string, path string, ifModifiedSince time.Time) (*Collection, error) {
 	lastDataLoad.SetToCurrentTime()
 	numDataLoads.Inc()
 
@@ -272,6 +277,10 @@ func readCollection(name, path string) (*Collection, error) {
 	if err != nil {
 		numDataLoadErrors.Inc()
 		return nil, err
+	}
+
+	if !stat.ModTime().After(ifModifiedSince) {
+		return nil, NotModified
 	}
 
 	data, err := ioutil.ReadFile(absPath)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -190,6 +191,50 @@ func TestReadCollection_CollectionMetrics(t *testing.T) {
 	delta := time.Since(loaded)
 	if delta.Seconds() > 10.0 {
 		t.Fatalf("expected timestamp for castles/loaded within 10s from now, got %s", delta)
+	}
+}
+
+func TestReadCollection_IfModifiedSince(t *testing.T) {
+	tmpfile, _ := ioutil.TempFile("", "test.*.geojson")
+	defer os.Remove(tmpfile.Name())
+	tmpfile.Write([]byte(`{"features":[]}`))
+	tmpfile.Close()
+
+	t1 := time.Date(2001, time.February, 1, 3, 4, 5, 0, time.UTC)
+	t2 := time.Date(2002, time.February, 1, 3, 4, 5, 0, time.UTC)
+	t3 := time.Date(2003, time.February, 1, 3, 4, 5, 0, time.UTC)
+
+	os.Chtimes(tmpfile.Name(), t1, t1)
+	if _, err := readCollection("test", tmpfile.Name(), t1); err != NotModified {
+		t.Errorf("expected NotModified for mod=T1/ifModifiedSince=T1, got %v", err)
+	}
+	if _, err := readCollection("test", tmpfile.Name(), t2); err != NotModified {
+		t.Errorf("expected NotModified for mod=T1/ifModifiedSince=T2, got %v", err)
+	}
+	if _, err := readCollection("test", tmpfile.Name(), t3); err != NotModified {
+		t.Errorf("expected NotModified for mod=T1/ifModifiedSince=T3, got %v", err)
+	}
+
+	os.Chtimes(tmpfile.Name(), t2, t2)
+	if _, err := readCollection("test", tmpfile.Name(), t1); err != nil {
+		t.Errorf("expected no error for mod=T2/ifModifiedSince=T1, got %v", err)
+	}
+	if _, err := readCollection("test", tmpfile.Name(), t2); err != NotModified {
+		t.Errorf("expected NotModified for mod=T2/ifModifiedSince=T2, got %v", err)
+	}
+	if _, err := readCollection("test", tmpfile.Name(), t3); err != NotModified {
+		t.Errorf("expected NotModified for mod=T2/ifModifiedSince=T3, got %v", err)
+	}
+
+	os.Chtimes(tmpfile.Name(), t3, t3)
+	if _, err := readCollection("test", tmpfile.Name(), t1); err != nil {
+		t.Errorf("expected no error for mod=T3/ifModifiedSince=T1, got %v", err)
+	}
+	if _, err := readCollection("test", tmpfile.Name(), t2); err != nil {
+		t.Errorf("expected no error for mod=T3/ifModifiedSince=T2, got %v", err)
+	}
+	if _, err := readCollection("test", tmpfile.Name(), t3); err != NotModified {
+		t.Errorf("expected NotModified for mod=T3/ifModifiedSince=T3, got %v", err)
 	}
 }
 
