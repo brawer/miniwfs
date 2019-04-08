@@ -28,11 +28,16 @@ type Index struct {
 	watcher     *fsnotify.Watcher
 }
 
+type CollectionMetadata struct {
+	Name         string
+	LastModified time.Time
+}
+
 type Collection struct {
+	metadata CollectionMetadata
 	Features geojson.FeatureCollection
 	bbox     []s2.Rect
 	Path     string
-	lastMod  time.Time
 	byID     map[string]int // "W77" -> 3 if Features[3].ID == "W77"
 }
 
@@ -212,33 +217,34 @@ func (index *Index) watchFiles() {
 			if !ok {
 				return
 			}
-			if event.Op&fsnotify.Write == fsnotify.Write {
-				path := event.Name
-				name := index.getCollectionNameForPath(path)
-				if name != "" {
-					if coll, err := readCollection(name, path); err == nil {
-						log.Printf("success reading collection %s from %s", name, path)
-						index.replaceCollection(coll)
-					} else {
-						log.Printf("error reading collection %s at %s: %v",
-							name, path, err)
-					}
+			if event.Op&fsnotify.Remove == fsnotify.Remove {
+				return
+			}
+			path := event.Name
+			md := index.getCollectionMetadata(path)
+			if md != nil {
+				if coll, err := readCollection(md.Name, path); err == nil {
+					log.Printf("success reading collection %s from %s", md.Name, path)
+					index.replaceCollection(coll)
+				} else {
+					log.Printf("error reading collection %s at %s: %v",
+						md.Name, path, err)
 				}
 			}
 		}
 	}
 }
 
-func (index *Index) getCollectionNameForPath(path string) string {
+func (index *Index) getCollectionMetadata(path string) *CollectionMetadata {
 	index.mutex.Lock()
 	defer index.mutex.Unlock()
 
-	for name, c := range index.Collections {
+	for _, c := range index.Collections {
 		if path == c.Path {
-			return name
+			return &c.metadata
 		}
 	}
-	return ""
+	return nil
 }
 
 func (index *Index) replaceCollection(c *Collection) {
@@ -274,7 +280,10 @@ func readCollection(name, path string) (*Collection, error) {
 		return nil, err
 	}
 
-	coll := &Collection{Path: absPath, lastMod: stat.ModTime()}
+	coll := &Collection{Path: absPath}
+	coll.metadata.LastModified = stat.ModTime()
+	coll.metadata.Name = name
+
 	if err := json.Unmarshal(data, &coll.Features); err != nil {
 		numDataLoadErrors.Inc()
 		return nil, err
@@ -327,7 +336,7 @@ func readCollection(name, path string) (*Collection, error) {
 			}
 		}
 	}
-	collectionTimestamp.WithLabelValues(name, "last_modified").Set(float64(coll.lastMod.UTC().Unix()))
+	collectionTimestamp.WithLabelValues(name, "last_modified").Set(float64(coll.metadata.LastModified.UTC().Unix()))
 	collectionTimestamp.WithLabelValues(name, "loaded").Set(float64(time.Now().UTC().Unix()))
 	collectionFeaturesCount.WithLabelValues(name).Set(float64(len(coll.Features.Features)))
 
