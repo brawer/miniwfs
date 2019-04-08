@@ -10,13 +10,13 @@
 # $ curl http://localhost:8080/collections/castles/items/W548140156
 # $ curl http://localhost:8080/metrics
 
-FROM golang:alpine3.9 as builder
+FROM golang:1.12-alpine3.9 as builder
 WORKDIR /src/miniwfs
-RUN apk --no-cache add git
+RUN apk --no-cache add build-base git
 COPY . ./
 RUN go mod download
-RUN CGO_ENABLED=0 go build -a -o miniwfs .
-RUN CGO_ENABLED=0 go test
+RUN CGO_ENABLED=1 go build -a -o miniwfs .
+RUN CGO_ENABLED=1 go test
 
 FROM alpine:3.9
 RUN apk --no-cache add ca-certificates
