@@ -39,6 +39,7 @@ type Collection struct {
 	metadata CollectionMetadata
 	dataFile *os.File // temporary file, will be deleted
 	Features geojson.FeatureCollection
+	offset   []int64 // offset in dataFile
 	bbox     []s2.Rect
 	byID     map[string]int // "W77" -> 3 if Features[3].ID == "W77"
 }
@@ -355,16 +356,16 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 	}
 	coll.dataFile = dataFile
 
-	bbox := make([]s2.Rect, len(coll.Features.Features))
-	coll.bbox = bbox
-	for i, f := range coll.Features.Features {
-		if f != nil {
-			bbox[i] = computeBounds(f.Geometry)
-		}
+	headerSize, err := dataFile.Write([]byte(`{"type":"FeatureCollection","features":[\n`))
+	if err != nil {
+		coll.Close()
+		return nil, err
 	}
+	pos := int64(headerSize)
 
-	byID := make(map[string]int)
-	coll.byID = byID
+	coll.bbox = make([]s2.Rect, len(coll.Features.Features))
+	coll.offset = make([]int64, len(coll.Features.Features)+1)
+	coll.byID = make(map[string]int)
 
 	for i, f := range coll.Features.Features {
 		id := getIDString(f.ID)
@@ -376,8 +377,37 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 		}
 		if len(id) > 0 {
 			f.ID = id
-			byID[id] = i
+			coll.byID[id] = i
 		}
+
+		coll.bbox[i] = computeBounds(f.Geometry)
+		coll.offset[i] = pos
+		if i > 0 {
+			if _, err := dataFile.Write([]byte(",\n")); err == nil {
+				pos += 2
+			} else {
+				coll.Close()
+				return nil, err
+			}
+		}
+
+		encoded, err := json.Marshal(f)
+		if err != nil {
+			coll.Close()
+			return nil, err
+		}
+
+		if numBytes, err := dataFile.Write(encoded); err == nil {
+			pos = pos + int64(numBytes)
+		} else {
+			coll.Close()
+			return nil, err
+		}
+	}
+	coll.offset[len(coll.offset)-1] = pos + 2 // 2 = len(",\n")
+	if _, err := dataFile.Write([]byte("\n]}\n")); err != nil {
+		coll.Close()
+		return nil, err
 	}
 
 	// RFC 7946 does not define a "properties" member on FeatureCollection,
