@@ -17,8 +17,9 @@ import (
 	"github.com/golang/geo/s2"
 )
 
-func makeServer(t *testing.T) *WebServer {
-	return MakeWebServer(loadTestIndex(t))
+func makeServer(t *testing.T) (*Index, *WebServer) {
+     index := loadTestIndex(t)
+	return index, MakeWebServer(index)
 }
 
 func getBody(r *httptest.ResponseRecorder) string {
@@ -103,7 +104,10 @@ func TestParseBbox_3D(t *testing.T) {
 }
 
 func TestHome(t *testing.T) {
-	s := makeServer(t)
+	index, s := makeServer(t)
+	defer s.Shutdown()
+	defer index.Close()
+
 	query, _ := http.NewRequest("GET", "/", nil)
 	handler := http.HandlerFunc(s.HandleRequest)
 	resp := httptest.NewRecorder()
@@ -120,7 +124,9 @@ func TestHome(t *testing.T) {
 }
 
 func TestListCollections(t *testing.T) {
-	s := makeServer(t)
+	index, s := makeServer(t)
+	defer s.Shutdown()
+	defer index.Close()
 	query, _ := http.NewRequest("GET", "/collections", nil)
 	handler := http.HandlerFunc(s.HandleRequest)
 	resp := httptest.NewRecorder()
@@ -168,7 +174,9 @@ func TestListCollections(t *testing.T) {
 }
 
 func TestCollection(t *testing.T) {
-	s := makeServer(t)
+	index, s := makeServer(t)
+	defer s.Shutdown()
+	defer index.Close()
 	query, _ := http.NewRequest("GET", "/collections/castles/items?bbox=11.183467,47.910413,11.183469,47.910415", nil)
 	handler := http.HandlerFunc(s.HandleRequest)
 	resp := httptest.NewRecorder()
@@ -223,7 +231,9 @@ func TestCollection(t *testing.T) {
 }
 
 func TestCollection_NotFound(t *testing.T) {
-	s := makeServer(t)
+	index, s := makeServer(t)
+	defer s.Shutdown()
+	defer index.Close()
 	query, _ := http.NewRequest("GET", "/collections/nosuchcollection/items", nil)
 	handler := http.HandlerFunc(s.HandleRequest)
 	resp := httptest.NewRecorder()
@@ -240,7 +250,10 @@ func TestCollection_IfModifiedSince(t *testing.T) {
 	present := stat.ModTime().UTC().Format(http.TimeFormat)
 	future := stat.ModTime().Add(time.Hour).UTC().Format(http.TimeFormat)
 
-	server := makeServer(t)
+	index, server := makeServer(t)
+	defer server.Shutdown()
+	defer index.Close()
+
 	type testCase struct {
 		Status            int
 		IfModifiedSince   string
@@ -281,7 +294,9 @@ func TestCollection_IfModifiedSince(t *testing.T) {
 }
 
 func TestItem(t *testing.T) {
-	s := makeServer(t)
+	index, s := makeServer(t)
+	defer s.Shutdown()
+	defer index.Close()
 	query, _ := http.NewRequest("GET", "/collections/lakes/items/N123", nil)
 	handler := http.HandlerFunc(s.HandleRequest)
 	resp := httptest.NewRecorder()

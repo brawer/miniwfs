@@ -32,7 +32,9 @@ func loadTestIndex(t *testing.T) *Index {
 var noTime time.Time
 
 func TestGetCollections(t *testing.T) {
-	colls := loadTestIndex(t).GetCollections()
+	index := loadTestIndex(t)
+	defer index.Close()
+	colls := index.GetCollections()
 	got := make([]string, len(colls))
 	for i, c := range colls {
 		got[i] = c.Name
@@ -44,28 +46,36 @@ func TestGetCollections(t *testing.T) {
 }
 
 func TestGetItem_ExistingItem(t *testing.T) {
-	got := loadTestIndex(t).GetItem("castles", "W418392510")
+	index := loadTestIndex(t)
+	defer index.Close()
+	got := index.GetItem("castles", "W418392510")
 	if got == nil || got.Properties["name"] != "Castello Scaligero" {
 		t.Fatalf("expected W418392510, got %v", got)
 	}
 }
 
 func TestGetItem_NoSuchCollection(t *testing.T) {
-	got := loadTestIndex(t).GetItem("no-such-collection", "123")
+	index := loadTestIndex(t)
+	defer index.Close()
+	got := index.GetItem("no-such-collection", "123")
 	if got != nil {
 		t.Fatalf("expected nil, got %v", got)
 	}
 }
 
 func TestGetItem_NoSuchItem(t *testing.T) {
-	got := loadTestIndex(t).GetItem("castles", "unknown-id")
+	index := loadTestIndex(t)
+	defer index.Close()
+	got := index.GetItem("castles", "unknown-id")
 	if got != nil {
 		t.Fatalf("expected nil, got %v", got)
 	}
 }
 
 func TestGetItems_EmptyBbox(t *testing.T) {
-	_, got, _ := loadTestIndex(t).GetItems("castles", "", 0, DefaultLimit, s2.EmptyRect(), noTime, noTime)
+	index := loadTestIndex(t)
+	defer index.Close()
+	_, got, _ := index.GetItems("castles", "", 0, DefaultLimit, s2.EmptyRect(), noTime, noTime)
 	expectFeatureCollection(t, got, `{
 		"type": "FeatureCollection",
 		"links": [{
@@ -79,9 +89,11 @@ func TestGetItems_EmptyBbox(t *testing.T) {
 }
 
 func TestGetItems_KnownStartID(t *testing.T) {
+	index := loadTestIndex(t)
+	defer index.Close()
 	// startID=W418392510 is a known ID (of feature #1)
 	// start=77 should be ignored when startID is a known ID
-	_, got, _ := loadTestIndex(t).GetItems("castles", "W418392510", 77, 2, s2.FullRect(), noTime, noTime)
+	_, got, _ := index.GetItems("castles", "W418392510", 77, 2, s2.FullRect(), noTime, noTime)
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "W418392510,W24785843"
 	if expectedIDs != gotIDs {
@@ -100,7 +112,9 @@ func TestGetItems_KnownStartID(t *testing.T) {
 }
 
 func TestGetItems_UnknownStartID(t *testing.T) {
-	_, got, _ := loadTestIndex(t).GetItems("castles", "UnknownID", 2, 2, s2.FullRect(), noTime, noTime)
+	index := loadTestIndex(t)
+	defer index.Close()
+	_, got, _ := index.GetItems("castles", "UnknownID", 2, 2, s2.FullRect(), noTime, noTime)
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "W24785843"
 	if expectedIDs != gotIDs {
@@ -119,7 +133,9 @@ func TestGetItems_UnknownStartID(t *testing.T) {
 }
 
 func TestGetItems_NoStartID(t *testing.T) {
-	_, got, _ := loadTestIndex(t).GetItems("castles", "", 2, 2, s2.FullRect(), noTime, noTime)
+	index := loadTestIndex(t)
+	defer index.Close()
+	_, got, _ := index.GetItems("castles", "", 2, 2, s2.FullRect(), noTime, noTime)
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "W24785843"
 	if expectedIDs != gotIDs {
@@ -138,7 +154,9 @@ func TestGetItems_NoStartID(t *testing.T) {
 }
 
 func TestGetItems_LimitExceeded(t *testing.T) {
-	_, got, _ := loadTestIndex(t).GetItems("castles", "", 0, 2, s2.FullRect(), noTime, noTime)
+	index := loadTestIndex(t)
+	defer index.Close()
+	_, got, _ := index.GetItems("castles", "", 0, 2, s2.FullRect(), noTime, noTime)
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "N34729562,W418392510"
 	if expectedIDs != gotIDs {
@@ -163,16 +181,20 @@ func TestGetItems_LimitExceeded(t *testing.T) {
 }
 
 func TestGetItems_NoSuchCollection(t *testing.T) {
-	_, got, _ := loadTestIndex(t).GetItems("no-such-collection", "", 0, DefaultLimit, s2.FullRect(), noTime, noTime)
+	index := loadTestIndex(t)
+	defer index.Close()
+	_, got, _ := index.GetItems("no-such-collection", "", 0, DefaultLimit, s2.FullRect(), noTime, noTime)
 	if got != nil {
 		t.Fatalf("expected nil, got %v", got)
 	}
 }
 
 func TestGetItems_Metadata(t *testing.T) {
+	index := loadTestIndex(t)
+	defer index.Close()
 	stat, _ := os.Stat(filepath.Join("testdata", "castles.geojson"))
 	expectedLastModified := stat.ModTime().UTC().Format(time.RFC3339)
-	_, _, md := loadTestIndex(t).GetItems("castles", "", 0, 2, s2.FullRect(), noTime, noTime)
+	_, _, md := index.GetItems("castles", "", 0, 2, s2.FullRect(), noTime, noTime)
 	gotLastModified := md.LastModified.UTC().Format(time.RFC3339)
 	if expectedLastModified != gotLastModified {
 		t.Errorf("exptected LastModified=%s in metadata, got %s",
@@ -181,8 +203,8 @@ func TestGetItems_Metadata(t *testing.T) {
 }
 
 func TestReadCollection_CollectionMetrics(t *testing.T) {
-	loadTestIndex(t)
-
+	index := loadTestIndex(t)
+	defer index.Close()
 	m, _ := collectionFeaturesCount.GetMetricWithLabelValues("castles")
 	if promtest.ToFloat64(m) != 3 {
 		t.Fatalf("expected collectionFeaturesCount == 3 for castles, got %v", promtest.ToFloat64(m))

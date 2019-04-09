@@ -37,9 +37,17 @@ type CollectionMetadata struct {
 
 type Collection struct {
 	metadata CollectionMetadata
+	dataFile *os.File // temporary file, will be deleted
 	Features geojson.FeatureCollection
 	bbox     []s2.Rect
 	byID     map[string]int // "W77" -> 3 if Features[3].ID == "W77"
+}
+
+func (c *Collection) Close() {
+	if c.dataFile != nil {
+		c.dataFile.Close()
+		os.Remove(c.dataFile.Name())
+	}
 }
 
 var (
@@ -100,6 +108,13 @@ func MakeIndex(collections map[string]string, publicPath *url.URL) (*Index, erro
 }
 
 func (index *Index) Close() {
+	index.mutex.Lock()
+	defer index.mutex.Unlock()
+	for _, c := range index.Collections {
+		c.Close()
+		index.watcher.Remove(filepath.Dir(c.metadata.Path))
+	}
+	index.Collections = make(map[string]*Collection)
 }
 
 func (index *Index) GetCollections() []CollectionMetadata {
@@ -290,6 +305,9 @@ func (index *Index) getCollectionMetadata(path string) *CollectionMetadata {
 func (index *Index) replaceCollection(c *Collection) {
 	index.mutex.Lock()
 	defer index.mutex.Unlock()
+	if old := index.Collections[c.metadata.Name]; old != nil {
+		old.Close()
+	}
 	index.Collections[c.metadata.Name] = c
 }
 
@@ -330,6 +348,12 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 		numDataLoadErrors.Inc()
 		return nil, err
 	}
+
+	dataFile, err := ioutil.TempFile("", "miniwfs-*.geojson")
+	if err != nil {
+		return nil, err
+	}
+	coll.dataFile = dataFile
 
 	bbox := make([]s2.Rect, len(coll.Features.Features))
 	coll.bbox = bbox
