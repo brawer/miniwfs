@@ -18,7 +18,7 @@ import (
 )
 
 func makeServer(t *testing.T) (*Index, *WebServer) {
-     index := loadTestIndex(t)
+	index := loadTestIndex(t)
 	return index, MakeWebServer(index)
 }
 
