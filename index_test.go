@@ -48,7 +48,7 @@ func TestGetCollections(t *testing.T) {
 func TestGetItem_ExistingItem(t *testing.T) {
 	index := loadTestIndex(t)
 	defer index.Close()
-	got := index.GetItem("castles", "W418392510")
+	got, _ := index.GetItem("castles", "W418392510")
 	if got == nil || got.Properties["name"] != "Castello Scaligero" {
 		t.Fatalf("expected W418392510, got %v", got)
 	}
@@ -57,7 +57,7 @@ func TestGetItem_ExistingItem(t *testing.T) {
 func TestGetItem_NoSuchCollection(t *testing.T) {
 	index := loadTestIndex(t)
 	defer index.Close()
-	got := index.GetItem("no-such-collection", "123")
+	got, _ := index.GetItem("no-such-collection", "123")
 	if got != nil {
 		t.Fatalf("expected nil, got %v", got)
 	}
@@ -66,7 +66,7 @@ func TestGetItem_NoSuchCollection(t *testing.T) {
 func TestGetItem_NoSuchItem(t *testing.T) {
 	index := loadTestIndex(t)
 	defer index.Close()
-	got := index.GetItem("castles", "unknown-id")
+	got, _ := index.GetItem("castles", "unknown-id")
 	if got != nil {
 		t.Fatalf("expected nil, got %v", got)
 	}

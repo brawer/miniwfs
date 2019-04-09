@@ -132,20 +132,33 @@ func (index *Index) GetCollections() []CollectionMetadata {
 	return md
 }
 
-func (index *Index) GetItem(collection string, id string) *geojson.Feature {
+func (index *Index) GetItem(collection string, id string) (*geojson.Feature, error) {
 	index.mutex.RLock()
 	defer index.mutex.RUnlock()
 
 	coll := index.Collections[collection]
 	if coll == nil {
-		return nil
+		return nil, nil
 	}
 
-	if index, ok := coll.byID[id]; ok {
-		return coll.Features.Features[index]
-	} else {
-		return nil
+	i, ok := coll.byID[id]
+	if !ok {
+		return nil, nil
 	}
+
+	offset := coll.offset[i]
+	jsonLen := int(coll.offset[i+1] - offset - 2)
+	b := make([]byte, jsonLen)
+	if _, err := coll.dataFile.ReadAt(b, offset); err != nil {
+		return nil, err
+	}
+
+	var result geojson.Feature
+	if err := json.Unmarshal(b, &result); err != nil {
+		return nil, err
+	}
+
+	return coll.Features.Features[i], nil
 }
 
 // We take both startID and startIndex to be more resilient when our

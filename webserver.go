@@ -248,7 +248,12 @@ func parseBbox(s string) (s2.Rect, error) {
 
 func (s *WebServer) handleItemRequest(w http.ResponseWriter, req *http.Request,
 	collection string, item string) {
-	feature := s.index.GetItem(collection, item)
+	feature, err := s.index.GetItem(collection, item)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	if feature == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
