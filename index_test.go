@@ -63,7 +63,7 @@ func TestGetItem_NoSuchItem(t *testing.T) {
 }
 
 func TestGetItems_EmptyBbox(t *testing.T) {
-	got, _ := loadTestIndex(t).GetItems("castles", "", 0, DefaultLimit, s2.EmptyRect())
+	_, got, _ := loadTestIndex(t).GetItems("castles", "", 0, DefaultLimit, s2.EmptyRect())
 	expectFeatureCollection(t, got, `{
 		"type": "FeatureCollection",
 		"links": [{
@@ -79,7 +79,7 @@ func TestGetItems_EmptyBbox(t *testing.T) {
 func TestGetItems_KnownStartID(t *testing.T) {
 	// startID=W418392510 is a known ID (of feature #1)
 	// start=77 should be ignored when startID is a known ID
-	got, _ := loadTestIndex(t).GetItems("castles", "W418392510", 77, 2, s2.FullRect())
+	_, got, _ := loadTestIndex(t).GetItems("castles", "W418392510", 77, 2, s2.FullRect())
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "W418392510,W24785843"
 	if expectedIDs != gotIDs {
@@ -98,7 +98,7 @@ func TestGetItems_KnownStartID(t *testing.T) {
 }
 
 func TestGetItems_UnknownStartID(t *testing.T) {
-	got, _ := loadTestIndex(t).GetItems("castles", "UnknownID", 2, 2, s2.FullRect())
+	_, got, _ := loadTestIndex(t).GetItems("castles", "UnknownID", 2, 2, s2.FullRect())
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "W24785843"
 	if expectedIDs != gotIDs {
@@ -117,7 +117,7 @@ func TestGetItems_UnknownStartID(t *testing.T) {
 }
 
 func TestGetItems_NoStartID(t *testing.T) {
-	got, _ := loadTestIndex(t).GetItems("castles", "", 2, 2, s2.FullRect())
+	_, got, _ := loadTestIndex(t).GetItems("castles", "", 2, 2, s2.FullRect())
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "W24785843"
 	if expectedIDs != gotIDs {
@@ -136,7 +136,7 @@ func TestGetItems_NoStartID(t *testing.T) {
 }
 
 func TestGetItems_LimitExceeded(t *testing.T) {
-	got, _ := loadTestIndex(t).GetItems("castles", "", 0, 2, s2.FullRect())
+	_, got, _ := loadTestIndex(t).GetItems("castles", "", 0, 2, s2.FullRect())
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "N34729562,W418392510"
 	if expectedIDs != gotIDs {
@@ -161,7 +161,7 @@ func TestGetItems_LimitExceeded(t *testing.T) {
 }
 
 func TestGetItems_NoSuchCollection(t *testing.T) {
-	got, _ := loadTestIndex(t).GetItems("no-such-collection", "", 0, DefaultLimit, s2.FullRect())
+	_, got, _ := loadTestIndex(t).GetItems("no-such-collection", "", 0, DefaultLimit, s2.FullRect())
 	if got != nil {
 		t.Fatalf("expected nil, got %v", got)
 	}
@@ -170,7 +170,7 @@ func TestGetItems_NoSuchCollection(t *testing.T) {
 func TestGetItems_Metadata(t *testing.T) {
 	stat, _ := os.Stat(filepath.Join("testdata", "castles.geojson"))
 	expectedLastModified := stat.ModTime().UTC().Format(time.RFC3339)
-	_, md := loadTestIndex(t).GetItems("castles", "", 0, 2, s2.FullRect())
+	_, _, md := loadTestIndex(t).GetItems("castles", "", 0, 2, s2.FullRect())
 	gotLastModified := md.LastModified.UTC().Format(time.RFC3339)
 	if expectedLastModified != gotLastModified {
 		t.Errorf("exptected LastModified=%s in metadata, got %s",

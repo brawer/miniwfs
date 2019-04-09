@@ -151,9 +151,21 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	result, metadata := s.index.GetItems(collection, startID, start, limit, bbox)
-	if result == nil {
+	err, result, metadata := s.index.GetItems(collection, startID, start, limit, bbox)
+	switch err {
+	case nil:
+		break
+
+	case NotFound:
 		w.WriteHeader(http.StatusNotFound)
+		return
+
+	case NotModified:
+		w.WriteHeader(http.StatusNotModified)
+		return
+
+	default:
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 

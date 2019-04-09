@@ -221,6 +221,18 @@ func TestCollection(t *testing.T) {
         }`)
 }
 
+func TestCollection_NotFound(t *testing.T) {
+	s := makeServer(t)
+	query, _ := http.NewRequest("GET", "/collections/nosuchcollection/items", nil)
+	handler := http.HandlerFunc(s.HandleRequest)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, query)
+	r := resp.Result()
+	if r.StatusCode != http.StatusNotFound {
+		t.Errorf("expected %d, got %d", http.StatusNotFound, r.StatusCode)
+	}
+}
+
 func TestItem(t *testing.T) {
 	s := makeServer(t)
 	query, _ := http.NewRequest("GET", "/collections/lakes/items/N123", nil)

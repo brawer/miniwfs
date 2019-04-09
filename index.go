@@ -131,7 +131,7 @@ func (index *Index) GetItem(collection string, id string) *geojson.Feature {
 // data changes while a client is iterating over paged results. If
 // startID is a known ID, we start the iteration there; otherwise, we
 // start the iteration at the feature whose index is startIndex.
-func (index *Index) GetItems(collection string, startID string, startIndex int, limit int, bbox s2.Rect) (*WFSFeatureCollection, CollectionMetadata) {
+func (index *Index) GetItems(collection string, startID string, startIndex int, limit int, bbox s2.Rect) (error, *WFSFeatureCollection, CollectionMetadata) {
 	// We intentionally return CollectionMetadata and not *CollectionMetadata
 	// so that the metadata gets copied before unlocking the reader mutex.
 	// Otherwise, the metadata content could change after returning from
@@ -143,7 +143,7 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 
 	coll := index.Collections[collection]
 	if coll == nil {
-		return nil, CollectionMetadata{}
+		return NotFound, nil, CollectionMetadata{}
 	}
 
 	if limit < 1 {
@@ -214,7 +214,7 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 		result.Links = append(result.Links, nextLink)
 	}
 
-	return result, coll.metadata
+	return nil, result, coll.metadata
 }
 
 func (index *Index) watchFiles() {
@@ -278,6 +278,7 @@ func (index *Index) replaceCollection(c *Collection) {
 	index.Collections[c.metadata.Name] = c
 }
 
+var NotFound error = errors.New("FeatureCollection not found")
 var NotModified error = errors.New("FeatureCollection not modified")
 
 // Returns NotModified if the collection has not been modfied since time ifModifiedSince.
