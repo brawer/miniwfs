@@ -5,8 +5,11 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -37,12 +40,21 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	http.Handle("/metrics", promhttp.Handler())
+	defer index.Close()
 
 	server := MakeWebServer(index)
+	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/collections", server.HandleRequest)
 	http.HandleFunc("/collections/", server.HandleRequest)
 	log.Printf("Listening for requests on port %v\n", strconv.Itoa(*port))
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*port), nil))
+	go func() { // Gracefully shut down server upon SIGINT, so we do not lose queries.
+		sigint := make(chan os.Signal, 1)
+		signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM)
+		<-sigint
+		server.Shutdown()
+	}()
+	if err := server.ListenAndServe(*port); err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
+	log.Printf("Server has shut down.\n")
 }

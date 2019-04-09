@@ -99,6 +99,9 @@ func MakeIndex(collections map[string]string, publicPath *url.URL) (*Index, erro
 	return index, nil
 }
 
+func (index *Index) Close() {
+}
+
 func (index *Index) GetCollections() []CollectionMetadata {
 	index.mutex.RLock()
 	defer index.mutex.RUnlock()

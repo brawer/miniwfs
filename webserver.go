@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	//"fmt"
@@ -16,17 +17,31 @@ import (
 )
 
 type WebServer struct {
-	index *Index
+	index                *Index
+	httpServer           http.Server
+	shutdownHasCompleted chan struct{}
 }
 
 func MakeWebServer(index *Index) *WebServer {
-	s := &WebServer{index: index}
+	s := &WebServer{index: index, shutdownHasCompleted: make(chan struct{})}
 	return s
 }
 
 var collectionRegexp = regexp.MustCompile(`^/collections/([^/]+)/items$`)
 var itemRegexp = regexp.MustCompile(`^/collections/([^/]+)/items/(.+)$`)
 var listCollectionsRegexp = regexp.MustCompile(`^/collections/?$`)
+
+func (s *WebServer) ListenAndServe(port int) error {
+	s.httpServer.Addr = ":" + strconv.Itoa(port)
+	err := s.httpServer.ListenAndServe()
+	<-s.shutdownHasCompleted
+	return err
+}
+
+func (s *WebServer) Shutdown() {
+	s.httpServer.Shutdown(context.Background())
+	close(s.shutdownHasCompleted)
+}
 
 func (s *WebServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	if m := collectionRegexp.FindStringSubmatch(req.URL.Path); len(m) == 2 {
