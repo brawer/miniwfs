@@ -368,15 +368,7 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 	coll.byID = make(map[string]int)
 
 	for i, f := range coll.Features.Features {
-		id := getIDString(f.ID)
-		if len(id) == 0 {
-			id = getIDString(f.Properties["id"])
-		}
-		if len(id) == 0 {
-			id = getIDString(f.Properties[".id"])
-		}
-		if len(id) > 0 {
-			f.ID = id
+		if id := getIDString(f.ID); len(id) > 0 {
 			coll.byID[id] = i
 		}
 
