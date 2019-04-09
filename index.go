@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	//"fmt"
@@ -41,6 +42,7 @@ type Collection struct {
 	Features geojson.FeatureCollection
 	offset   []int64 // offset in dataFile
 	bbox     []s2.Rect
+	id       []string
 	byID     map[string]int // "W77" -> 3 if Features[3].ID == "W77"
 }
 
@@ -164,6 +166,7 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 	index.mutex.RLock()
 	defer index.mutex.RUnlock()
 
+	var out bytes.Buffer
 	coll := index.Collections[collection]
 	if coll == nil {
 		return NotFound, nil, CollectionMetadata{}
@@ -193,6 +196,10 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 		startIndex = 0
 	}
 
+	if _, err := out.Write([]byte(`{"type":"FeatureCollection","features":[`)); err != nil {
+		return err, nil, CollectionMetadata{}
+	}
+
 	// If we had more data, we could compute s2 cell coverages and only
 	// check the intersection for features inside the coverage area.
 	// But we operate on a few thousand features, so let's keep things simple
@@ -202,14 +209,15 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 	var nextID string
 	var nextIndex int
 	skip := startIndex
+	numFeatures := 0
+	buffer := make([]byte, 0, 50*1024)
 	for i, featureBounds := range coll.bbox {
 		if !bbox.Intersects(featureBounds) {
 			continue
 		}
 
-		feature := coll.Features.Features[i]
-		if len(features) >= limit {
-			nextID = getIDString(feature.ID)
+		if numFeatures >= limit {
+			nextID = coll.id[i]
 			nextIndex = i
 			break
 		}
@@ -217,12 +225,40 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 			skip = skip - 1
 			continue
 		}
+		feature := coll.Features.Features[i]
 		features = append(features, feature)
+
+		if numFeatures > 0 {
+			if _, err := out.Write([]byte{','}); err != nil {
+				return err, nil, CollectionMetadata{}
+			}
+		}
+
+		b := buffer
+		jsonLen := int(coll.offset[i+1] - coll.offset[i] - 2)
+		if jsonLen > cap(b) {
+			b = make([]byte, 0, jsonLen)
+		}
+		if _, err := coll.dataFile.ReadAt(b[0:jsonLen], coll.offset[i]); err != nil {
+			return err, nil, CollectionMetadata{}
+		}
+		if _, err := out.Write(b[0:jsonLen]); err != nil {
+			return err, nil, CollectionMetadata{}
+		}
+
+		numFeatures += 1
 		bounds = bounds.Union(featureBounds)
 	}
 
-	result := &WFSFeatureCollection{Type: "FeatureCollection"}
-	result.Features = features
+	if _, err := out.Write([]byte(`],`)); err != nil {
+		return err, nil, CollectionMetadata{}
+	}
+
+	type Footer struct {
+		Links       []*WFSLink `json:"links,omitempty"`
+		BoundingBox []float64  `json:"bbox,omitempty"`
+	}
+	var footer Footer
 
 	pathPrefix := index.PublicPath.String()
 	selfLink := &WFSLink{
@@ -232,8 +268,8 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 	}
 
 	selfLink.Href = FormatItemsURL(pathPrefix, collection, startID, startIndex, limit, bbox)
-	result.Links = append(result.Links, selfLink)
-	result.BoundingBox = EncodeBbox(bounds)
+	footer.Links = append(footer.Links, selfLink)
+	footer.BoundingBox = EncodeBbox(bounds)
 
 	if nextIndex > 0 {
 		nextLink := &WFSLink{
@@ -242,7 +278,20 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 			Type:  "application/geo+json",
 		}
 		nextLink.Href = FormatItemsURL(pathPrefix, collection, nextID, nextIndex, limit, bbox)
-		result.Links = append(result.Links, nextLink)
+		footer.Links = append(footer.Links, nextLink)
+	}
+
+	encodedFooter, err := json.Marshal(footer)
+	if err != nil {
+		return err, nil, CollectionMetadata{}
+	}
+	if _, err := out.Write(encodedFooter[1:]); err != nil {
+		return err, nil, CollectionMetadata{}
+	}
+
+	result := &WFSFeatureCollection{}
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		return err, nil, CollectionMetadata{}
 	}
 
 	return nil, result, coll.metadata
@@ -364,16 +413,17 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 	pos := int64(headerSize)
 
 	coll.bbox = make([]s2.Rect, len(coll.Features.Features))
+	coll.id = make([]string, len(coll.Features.Features))
 	coll.offset = make([]int64, len(coll.Features.Features)+1)
 	coll.byID = make(map[string]int)
 
 	for i, f := range coll.Features.Features {
 		if id := getIDString(f.ID); len(id) > 0 {
+			coll.id[i] = id
 			coll.byID[id] = i
 		}
 
 		coll.bbox[i] = computeBounds(f.Geometry)
-		coll.offset[i] = pos
 		if i > 0 {
 			if _, err := dataFile.Write([]byte(",\n")); err == nil {
 				pos += 2
@@ -382,6 +432,7 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 				return nil, err
 			}
 		}
+		coll.offset[i] = pos
 
 		encoded, err := json.Marshal(f)
 		if err != nil {
