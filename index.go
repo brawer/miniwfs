@@ -131,13 +131,19 @@ func (index *Index) GetItem(collection string, id string) *geojson.Feature {
 // data changes while a client is iterating over paged results. If
 // startID is a known ID, we start the iteration there; otherwise, we
 // start the iteration at the feature whose index is startIndex.
-func (index *Index) GetItems(collection string, startID string, startIndex int, limit int, bbox s2.Rect) *WFSFeatureCollection {
+func (index *Index) GetItems(collection string, startID string, startIndex int, limit int, bbox s2.Rect) (*WFSFeatureCollection, CollectionMetadata) {
+	// We intentionally return CollectionMetadata and not *CollectionMetadata
+	// so that the metadata gets copied before unlocking the reader mutex.
+	// Otherwise, the metadata content could change after returning from
+	// this function. The same problem does not occur with *WFSFeatureCollection
+	// because that is freshly allocated from scratch, and its members point to
+	// objects that are not overwritten.
 	index.mutex.RLock()
 	defer index.mutex.RUnlock()
 
 	coll := index.Collections[collection]
 	if coll == nil {
-		return nil
+		return nil, CollectionMetadata{}
 	}
 
 	if limit < 1 {
@@ -208,7 +214,7 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 		result.Links = append(result.Links, nextLink)
 	}
 
-	return result
+	return result, coll.metadata
 }
 
 func (index *Index) watchFiles() {

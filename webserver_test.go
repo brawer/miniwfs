@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -173,6 +175,13 @@ func TestCollection(t *testing.T) {
 
 	if ct := resp.Header().Get("Content-Type"); ct != "application/geo+json" {
 		t.Errorf("Expected Content-Type: application/geo+json, got %s", ct)
+	}
+
+	stat, _ := os.Stat(filepath.Join("testdata", "castles.geojson"))
+	expectedLastModified := stat.ModTime().UTC().Format(http.TimeFormat)
+	gotLastModified := resp.Header().Get("Last-Modified")
+	if expectedLastModified != gotLastModified {
+		t.Errorf("Expected Last-Modified: %s, got %s", expectedLastModified, gotLastModified)
 	}
 
 	expectCORSHeader(t, resp.Header())

@@ -151,7 +151,7 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	result := s.index.GetItems(collection, startID, start, limit, bbox)
+	result, metadata := s.index.GetItems(collection, startID, start, limit, bbox)
 	if result == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -164,8 +164,11 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/geo+json")
+	header := w.Header()
+	header.Set("Access-Control-Allow-Origin", "*")
+	header.Set("Content-Type", "application/geo+json")
+	header.Set("Last-Modified", metadata.LastModified.UTC().Format(http.TimeFormat))
+
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
 }
