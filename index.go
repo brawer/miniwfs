@@ -131,7 +131,11 @@ func (index *Index) GetItem(collection string, id string) *geojson.Feature {
 // data changes while a client is iterating over paged results. If
 // startID is a known ID, we start the iteration there; otherwise, we
 // start the iteration at the feature whose index is startIndex.
-func (index *Index) GetItems(collection string, startID string, startIndex int, limit int, bbox s2.Rect) (error, *WFSFeatureCollection, CollectionMetadata) {
+//
+// If the collection has not been modified since time ifModifiedSince,
+// we return error NotModified (unless ifModifiedSince.IsZero() is true).
+func (index *Index) GetItems(collection string, startID string, startIndex int, limit int, bbox s2.Rect,
+	ifModifiedSince time.Time, ifUnmodifiedSince time.Time) (error, *WFSFeatureCollection, CollectionMetadata) {
 	// We intentionally return CollectionMetadata and not *CollectionMetadata
 	// so that the metadata gets copied before unlocking the reader mutex.
 	// Otherwise, the metadata content could change after returning from
@@ -144,6 +148,14 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 	coll := index.Collections[collection]
 	if coll == nil {
 		return NotFound, nil, CollectionMetadata{}
+	}
+
+	lastModified := coll.metadata.LastModified.Round(time.Second).UTC()
+	if !ifUnmodifiedSince.IsZero() && lastModified.After(ifUnmodifiedSince.Round(time.Second).UTC()) {
+		return Modified, nil, coll.metadata
+	}
+	if !ifModifiedSince.IsZero() && !lastModified.After(ifModifiedSince.Round(time.Second).UTC()) {
+		return NotModified, nil, coll.metadata
 	}
 
 	if limit < 1 {
@@ -278,6 +290,7 @@ func (index *Index) replaceCollection(c *Collection) {
 	index.Collections[c.metadata.Name] = c
 }
 
+var Modified error = errors.New("FeatureCollection has been modified")
 var NotFound error = errors.New("FeatureCollection not found")
 var NotModified error = errors.New("FeatureCollection not modified")
 

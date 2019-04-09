@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/geo/s2"
 )
@@ -230,6 +231,52 @@ func TestCollection_NotFound(t *testing.T) {
 	r := resp.Result()
 	if r.StatusCode != http.StatusNotFound {
 		t.Errorf("expected %d, got %d", http.StatusNotFound, r.StatusCode)
+	}
+}
+
+func TestCollection_IfModifiedSince(t *testing.T) {
+	stat, _ := os.Stat(filepath.Join("testdata", "castles.geojson"))
+	past := stat.ModTime().Add(-time.Hour).UTC().Format(http.TimeFormat)
+	present := stat.ModTime().UTC().Format(http.TimeFormat)
+	future := stat.ModTime().Add(time.Hour).UTC().Format(http.TimeFormat)
+
+	server := makeServer(t)
+	type testCase struct {
+		Status            int
+		IfModifiedSince   string
+		IfUnmodifiedSince string
+	}
+	tests := []testCase{
+		{200, "", ""},
+		{200, "junk", ""},
+		{200, "", "junk"},
+		{200, "junk", "junk"},
+
+		// RFC 7232, section 6, condition 4
+		{200, past, ""},
+		{304, present, ""},
+		{304, future, ""},
+
+		// RFC 7232, section 6, condition 2
+		{412, "", past},
+		{200, "", present},
+		{200, "", future},
+	}
+	for _, e := range tests {
+		query, _ := http.NewRequest("GET", "/collections/castles/items", nil)
+		if len(e.IfModifiedSince) > 0 {
+			query.Header.Add("If-Modified-Since", e.IfModifiedSince)
+		}
+		if len(e.IfUnmodifiedSince) > 0 {
+			query.Header.Add("If-Unmodified-Since", e.IfUnmodifiedSince)
+		}
+		handler := http.HandlerFunc(server.HandleRequest)
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, query)
+		if status := resp.Result().StatusCode; status != e.Status {
+			t.Errorf("expected %d for If-ModifiedSince: %s / If-Unmodified-Since: %s; got %d",
+				e.Status, e.IfModifiedSince, e.IfUnmodifiedSince, status)
+		}
 	}
 }
 

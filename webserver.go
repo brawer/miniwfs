@@ -121,6 +121,9 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 	collection string) {
 	params := req.URL.Query()
 
+	ifModifiedSince, _ := http.ParseTime(req.Header.Get("If-Modified-Since"))
+	ifUnmodifiedSince, _ := http.ParseTime(req.Header.Get("If-Unmodified-Since"))
+
 	start := 0
 	startParam := strings.TrimSpace(params.Get("start"))
 	if len(startParam) > 0 {
@@ -151,10 +154,15 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	err, result, metadata := s.index.GetItems(collection, startID, start, limit, bbox)
+	err, result, metadata := s.index.GetItems(collection, startID, start, limit, bbox,
+		ifModifiedSince, ifUnmodifiedSince)
 	switch err {
 	case nil:
 		break
+
+	case Modified:
+		w.WriteHeader(http.StatusPreconditionFailed)
+		return
 
 	case NotFound:
 		w.WriteHeader(http.StatusNotFound)
