@@ -39,8 +39,7 @@ type CollectionMetadata struct {
 type Collection struct {
 	metadata CollectionMetadata
 	dataFile *os.File // temporary file, will be deleted
-	Features geojson.FeatureCollection
-	offset   []int64 // offset in dataFile
+	offset   []int64  // offset into dataFile
 	bbox     []s2.Rect
 	id       []string
 	byID     map[string]int // "W77" -> 3 if Features[3].ID == "W77"
@@ -158,7 +157,7 @@ func (index *Index) GetItem(collection string, id string) (*geojson.Feature, err
 		return nil, err
 	}
 
-	return coll.Features.Features[i], nil
+	return &result, nil
 }
 
 // We take both startID and startIndex to be more resilient when our
@@ -217,7 +216,6 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 	// check the intersection for features inside the coverage area.
 	// But we operate on a few thousand features, so let's keep things simple
 	// for the time being.
-	features := make([]*geojson.Feature, 0, limit)
 	bounds := s2.EmptyRect()
 	var nextID string
 	var nextIndex int
@@ -238,8 +236,6 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 			skip = skip - 1
 			continue
 		}
-		feature := coll.Features.Features[i]
-		features = append(features, feature)
 
 		if numFeatures > 0 {
 			if _, err := out.Write([]byte{','}); err != nil {
@@ -407,7 +403,8 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 	coll.metadata.Name = name
 	coll.metadata.Path = absPath
 
-	if err := json.Unmarshal(data, &coll.Features); err != nil {
+	var features geojson.FeatureCollection
+	if err := json.Unmarshal(data, &features); err != nil {
 		numDataLoadErrors.Inc()
 		return nil, err
 	}
@@ -425,12 +422,13 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 	}
 	pos := int64(headerSize)
 
-	coll.bbox = make([]s2.Rect, len(coll.Features.Features))
-	coll.id = make([]string, len(coll.Features.Features))
-	coll.offset = make([]int64, len(coll.Features.Features)+1)
+	numFeatures := len(features.Features)
+	coll.bbox = make([]s2.Rect, numFeatures)
+	coll.id = make([]string, numFeatures)
+	coll.offset = make([]int64, numFeatures+1)
 	coll.byID = make(map[string]int)
 
-	for i, f := range coll.Features.Features {
+	for i, f := range features.Features {
 		if id := getIDString(f.ID); len(id) > 0 {
 			coll.id[i] = id
 			coll.byID[id] = i
@@ -493,7 +491,7 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 	numDataLoads.Inc()
 	collectionTimestamp.WithLabelValues(name, "last_modified").Set(float64(coll.metadata.LastModified.UTC().Unix()))
 	collectionTimestamp.WithLabelValues(name, "loaded").Set(float64(time.Now().UTC().Unix()))
-	collectionFeaturesCount.WithLabelValues(name).Set(float64(len(coll.Features.Features)))
+	collectionFeaturesCount.WithLabelValues(name).Set(float64(numFeatures))
 
 	return coll, nil
 }
