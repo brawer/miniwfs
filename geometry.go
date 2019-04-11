@@ -71,3 +71,17 @@ func computeLineBounds(line [][]float64) s2.Rect {
 	}
 	return r
 }
+
+func EncodeBbox(r s2.Rect) []float64 {
+	if r.IsEmpty() {
+		return nil
+	} else {
+		bbox := [4]float64{
+			r.Lo().Lng.Degrees(),
+			r.Lo().Lat.Degrees(),
+			r.Hi().Lng.Degrees(),
+			r.Hi().Lat.Degrees(),
+		}
+		return bbox[0:4]
+	}
+}

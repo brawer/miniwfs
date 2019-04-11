@@ -26,20 +26,6 @@ type WFSFeatureCollection struct {
 	Features    []*geojson.Feature `json:"features"`
 }
 
-func EncodeBbox(r s2.Rect) []float64 {
-	if r.IsEmpty() {
-		return nil
-	} else {
-		bbox := [4]float64{
-			r.Lo().Lng.Degrees(),
-			r.Lo().Lat.Degrees(),
-			r.Hi().Lng.Degrees(),
-			r.Hi().Lat.Degrees(),
-		}
-		return bbox[0:4]
-	}
-}
-
 func FormatItemsURL(prefix string, collection string,
 	startID string, start int, limit int, bbox s2.Rect) string {
 	params := make([]string, 0, 4)
