@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/url"
@@ -72,10 +73,27 @@ func TestGetItem_NoSuchItem(t *testing.T) {
 	}
 }
 
+func getItems(index *Index, collection string, startID string, startIndex int, limit int, bbox s2.Rect) (*WFSFeatureCollection, *CollectionMetadata, error) {
+	var buf bytes.Buffer
+	md, err := index.GetItems(collection, startID, startIndex, limit, bbox,
+		noTime, noTime, &buf)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var result WFSFeatureCollection
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		return nil, nil, err
+	}
+
+	return &result, &md, nil
+}
+
 func TestGetItems_EmptyBbox(t *testing.T) {
 	index := loadTestIndex(t)
 	defer index.Close()
-	_, got, _ := index.GetItems("castles", "", 0, DefaultLimit, s2.EmptyRect(), noTime, noTime)
+
+	got, _, _ := getItems(index, "castles", "", 0, DefaultLimit, s2.EmptyRect())
 	expectFeatureCollection(t, got, `{
 		"type": "FeatureCollection",
 		"links": [{
@@ -93,7 +111,7 @@ func TestGetItems_KnownStartID(t *testing.T) {
 	defer index.Close()
 	// startID=W418392510 is a known ID (of feature #1)
 	// start=77 should be ignored when startID is a known ID
-	_, got, _ := index.GetItems("castles", "W418392510", 77, 2, s2.FullRect(), noTime, noTime)
+	got, _, _ := getItems(index, "castles", "W418392510", 77, 2, s2.FullRect())
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "W418392510,W24785843"
 	if expectedIDs != gotIDs {
@@ -114,7 +132,7 @@ func TestGetItems_KnownStartID(t *testing.T) {
 func TestGetItems_UnknownStartID(t *testing.T) {
 	index := loadTestIndex(t)
 	defer index.Close()
-	_, got, _ := index.GetItems("castles", "UnknownID", 2, 2, s2.FullRect(), noTime, noTime)
+	got, _, _ := getItems(index, "castles", "UnknownID", 2, 2, s2.FullRect())
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "W24785843"
 	if expectedIDs != gotIDs {
@@ -135,7 +153,7 @@ func TestGetItems_UnknownStartID(t *testing.T) {
 func TestGetItems_NoStartID(t *testing.T) {
 	index := loadTestIndex(t)
 	defer index.Close()
-	_, got, _ := index.GetItems("castles", "", 2, 2, s2.FullRect(), noTime, noTime)
+	got, _, _ := getItems(index, "castles", "", 2, 2, s2.FullRect())
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "W24785843"
 	if expectedIDs != gotIDs {
@@ -156,7 +174,7 @@ func TestGetItems_NoStartID(t *testing.T) {
 func TestGetItems_LimitExceeded(t *testing.T) {
 	index := loadTestIndex(t)
 	defer index.Close()
-	_, got, _ := index.GetItems("castles", "", 0, 2, s2.FullRect(), noTime, noTime)
+	got, _, _ := getItems(index, "castles", "", 0, 2, s2.FullRect())
 	gotIDs := getFeatureIDs(got.Features)
 	expectedIDs := "N34729562,W418392510"
 	if expectedIDs != gotIDs {
@@ -183,9 +201,9 @@ func TestGetItems_LimitExceeded(t *testing.T) {
 func TestGetItems_NoSuchCollection(t *testing.T) {
 	index := loadTestIndex(t)
 	defer index.Close()
-	_, got, _ := index.GetItems("no-such-collection", "", 0, DefaultLimit, s2.FullRect(), noTime, noTime)
-	if got != nil {
-		t.Fatalf("expected nil, got %v", got)
+	_, _, err := getItems(index, "no-such-collection", "", 0, DefaultLimit, s2.FullRect())
+	if err != NotFound {
+		t.Errorf("expected %v, got %v", NotFound, err)
 	}
 }
 
@@ -194,7 +212,7 @@ func TestGetItems_Metadata(t *testing.T) {
 	defer index.Close()
 	stat, _ := os.Stat(filepath.Join("testdata", "castles.geojson"))
 	expectedLastModified := stat.ModTime().UTC().Format(time.RFC3339)
-	_, _, md := index.GetItems("castles", "", 0, 2, s2.FullRect(), noTime, noTime)
+	_, md, _ := getItems(index, "castles", "", 0, 2, s2.FullRect())
 	gotLastModified := md.LastModified.UTC().Format(time.RFC3339)
 	if expectedLastModified != gotLastModified {
 		t.Errorf("exptected LastModified=%s in metadata, got %s",

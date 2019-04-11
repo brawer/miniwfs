@@ -169,8 +169,9 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	err, result, metadata := s.index.GetItems(collection, startID, start, limit, bbox,
-		ifModifiedSince, ifUnmodifiedSince)
+	var buf bytes.Buffer
+	metadata, err := s.index.GetItems(collection, startID, start, limit, bbox,
+		ifModifiedSince, ifUnmodifiedSince, &buf)
 	switch err {
 	case nil:
 		break
@@ -192,20 +193,14 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	encoded, err := json.Marshal(result)
-	if err != nil {
-		log.Printf("json.Marshal failed: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
 	header := w.Header()
 	header.Set("Access-Control-Allow-Origin", "*")
+	header.Set("Content-Length", strconv.Itoa(buf.Len()))
 	header.Set("Content-Type", "application/geo+json")
 	header.Set("Last-Modified", metadata.LastModified.UTC().Format(http.TimeFormat))
 
 	w.WriteHeader(http.StatusOK)
-	w.Write(encoded)
+	buf.WriteTo(w)
 }
 
 var malformedBbox error = errors.New("malformed bbox parameter")

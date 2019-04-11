@@ -1,10 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	//"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -168,7 +168,7 @@ func (index *Index) GetItem(collection string, id string) (*geojson.Feature, err
 // If the collection has not been modified since time ifModifiedSince,
 // we return error NotModified (unless ifModifiedSince.IsZero() is true).
 func (index *Index) GetItems(collection string, startID string, startIndex int, limit int, bbox s2.Rect,
-	ifModifiedSince time.Time, ifUnmodifiedSince time.Time) (error, *WFSFeatureCollection, CollectionMetadata) {
+	ifModifiedSince time.Time, ifUnmodifiedSince time.Time, out io.Writer) (CollectionMetadata, error) {
 	// We intentionally return CollectionMetadata and not *CollectionMetadata
 	// so that the metadata gets copied before unlocking the reader mutex.
 	// Otherwise, the metadata content could change after returning from
@@ -178,18 +178,17 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 	index.mutex.RLock()
 	defer index.mutex.RUnlock()
 
-	var out bytes.Buffer
 	coll := index.Collections[collection]
 	if coll == nil {
-		return NotFound, nil, CollectionMetadata{}
+		return CollectionMetadata{}, NotFound
 	}
 
 	lastModified := coll.metadata.LastModified.Round(time.Second).UTC()
 	if !ifUnmodifiedSince.IsZero() && lastModified.After(ifUnmodifiedSince.Round(time.Second).UTC()) {
-		return Modified, nil, coll.metadata
+		return coll.metadata, Modified
 	}
 	if !ifModifiedSince.IsZero() && !lastModified.After(ifModifiedSince.Round(time.Second).UTC()) {
-		return NotModified, nil, coll.metadata
+		return coll.metadata, NotModified
 	}
 
 	if limit < 1 {
@@ -209,7 +208,7 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 	}
 
 	if _, err := out.Write([]byte(`{"type":"FeatureCollection","features":[`)); err != nil {
-		return err, nil, CollectionMetadata{}
+		return CollectionMetadata{}, err
 	}
 
 	// If we had more data, we could compute s2 cell coverages and only
@@ -239,7 +238,7 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 
 		if numFeatures > 0 {
 			if _, err := out.Write([]byte{','}); err != nil {
-				return err, nil, CollectionMetadata{}
+				return CollectionMetadata{}, err
 			}
 		}
 
@@ -249,10 +248,10 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 			b = make([]byte, 0, jsonLen)
 		}
 		if _, err := coll.dataFile.ReadAt(b[0:jsonLen], coll.offset[i]); err != nil {
-			return err, nil, CollectionMetadata{}
+			return CollectionMetadata{}, err
 		}
 		if _, err := out.Write(b[0:jsonLen]); err != nil {
-			return err, nil, CollectionMetadata{}
+			return CollectionMetadata{}, err
 		}
 
 		numFeatures += 1
@@ -260,7 +259,7 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 	}
 
 	if _, err := out.Write([]byte(`],`)); err != nil {
-		return err, nil, CollectionMetadata{}
+		return CollectionMetadata{}, err
 	}
 
 	type Footer struct {
@@ -292,18 +291,13 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 
 	encodedFooter, err := json.Marshal(footer)
 	if err != nil {
-		return err, nil, CollectionMetadata{}
+		return CollectionMetadata{}, err
 	}
 	if _, err := out.Write(encodedFooter[1:]); err != nil {
-		return err, nil, CollectionMetadata{}
+		return CollectionMetadata{}, err
 	}
 
-	result := &WFSFeatureCollection{}
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		return err, nil, CollectionMetadata{}
-	}
-
-	return nil, result, coll.metadata
+	return coll.metadata, nil
 }
 
 func (index *Index) watchFiles() {
