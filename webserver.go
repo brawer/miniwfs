@@ -30,6 +30,8 @@ func MakeWebServer(index *Index) *WebServer {
 var collectionRegexp = regexp.MustCompile(`^/collections/([^/]+)/items$`)
 var itemRegexp = regexp.MustCompile(`^/collections/([^/]+)/items/(.+)$`)
 var listCollectionsRegexp = regexp.MustCompile(`^/collections/?$`)
+var tilesRegexp = regexp.MustCompile(
+	`^/tiles/([^/]+)/([^/]+)/([^/]+)/([^/]+)\.png$`)
 
 func (s *WebServer) ListenAndServe(port int) error {
 	s.httpServer.Addr = ":" + strconv.Itoa(port)
@@ -44,6 +46,14 @@ func (s *WebServer) Shutdown() {
 }
 
 func (s *WebServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
+	if m := tilesRegexp.FindStringSubmatch(req.URL.Path); len(m) == 5 {
+		zoom, _ := strconv.Atoi(m[2])
+		x, _ := strconv.Atoi(m[3])
+		y, _ := strconv.Atoi(m[4])
+		s.handleTileRequest(w, req, m[1], zoom, x, y)
+		return
+	}
+
 	if m := collectionRegexp.FindStringSubmatch(req.URL.Path); len(m) == 2 {
 		s.handleCollectionRequest(w, req, m[1])
 		return
@@ -249,6 +259,23 @@ func (s *WebServer) handleItemRequest(w http.ResponseWriter, req *http.Request,
 	w.Header().Set("Content-Type", "application/geo+json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
+}
+
+func (s *WebServer) handleTileRequest(w http.ResponseWriter, req *http.Request,
+	collection string, zoom int, x int, y int) {
+	tile, metadata, err := s.index.GetTile(collection, zoom, x, y)
+	if status := getHTTPStatus(err); status != http.StatusOK {
+		w.WriteHeader(status)
+		return
+	}
+
+	header := w.Header()
+	header.Set("Access-Control-Allow-Origin", "*")
+	header.Set("Content-Length", strconv.Itoa(len(tile)))
+	header.Set("Content-Type", "image/png")
+	header.Set("Last-Modified", metadata.LastModified.UTC().Format(http.TimeFormat))
+	w.WriteHeader(http.StatusOK)
+	w.Write(tile)
 }
 
 func getHTTPStatus(err error) int {
