@@ -172,24 +172,8 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 	var buf bytes.Buffer
 	metadata, err := s.index.GetItems(collection, startID, start, limit, bbox,
 		ifModifiedSince, ifUnmodifiedSince, &buf)
-	switch err {
-	case nil:
-		break
-
-	case Modified:
-		w.WriteHeader(http.StatusPreconditionFailed)
-		return
-
-	case NotFound:
-		w.WriteHeader(http.StatusNotFound)
-		return
-
-	case NotModified:
-		w.WriteHeader(http.StatusNotModified)
-		return
-
-	default:
-		w.WriteHeader(http.StatusInternalServerError)
+	if status := getHTTPStatus(err); status != http.StatusOK {
+		w.WriteHeader(status)
 		return
 	}
 
@@ -265,4 +249,23 @@ func (s *WebServer) handleItemRequest(w http.ResponseWriter, req *http.Request,
 	w.Header().Set("Content-Type", "application/geo+json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
+}
+
+func getHTTPStatus(err error) int {
+	switch err {
+	case nil:
+		return http.StatusOK
+
+	case Modified:
+		return http.StatusPreconditionFailed
+
+	case NotFound:
+		return http.StatusNotFound
+
+	case NotModified:
+		return http.StatusNotModified
+
+	default:
+		return http.StatusInternalServerError
+	}
 }
