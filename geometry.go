@@ -95,9 +95,9 @@ func getTileBounds(zoom int, x int, y int) s2.Rect {
 }
 
 func projectWebMercator(p s2.LatLng) r2.Point {
-	siny := math.Sin(p.Lat.Degrees() * math.Pi / 180.0)
+	siny := math.Sin(p.Lat.Radians())
 	siny = math.Min(math.Max(siny, -0.9999), 0.9999)
-	x := 256 * (0.5 + p.Lng.Degrees()/360.0)
+	x := 256 * (0.5 + p.Lng.Degrees()/360)
 	y := 256 * (0.5 - math.Log((1+siny)/(1-siny))/(4*math.Pi))
 	return r2.Point{X: x, Y: y}
 }
