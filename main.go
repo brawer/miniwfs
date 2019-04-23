@@ -46,6 +46,7 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/collections", server.HandleRequest)
 	http.HandleFunc("/collections/", server.HandleRequest)
+	http.HandleFunc("/tiles/", server.HandleRequest)
 	log.Printf("Listening for requests on port %v\n", strconv.Itoa(*port))
 	go func() { // Gracefully shut down server upon SIGINT, so we do not lose queries.
 		sigint := make(chan os.Signal, 1)

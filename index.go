@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	//"fmt"
@@ -16,7 +17,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fogleman/gg"
 	"github.com/fsnotify/fsnotify"
+	"github.com/golang/geo/r2"
 	"github.com/golang/geo/s2"
 	"github.com/paulmach/go.geojson"
 	"github.com/prometheus/client_golang/prometheus"
@@ -37,12 +40,13 @@ type CollectionMetadata struct {
 }
 
 type Collection struct {
-	metadata CollectionMetadata
-	dataFile *os.File // temporary file, will be deleted
-	offset   []int64  // offset into dataFile
-	bbox     []s2.Rect
-	id       []string
-	byID     map[string]int // "W77" -> 3 if Features[3].ID == "W77"
+	metadata    CollectionMetadata
+	dataFile    *os.File // temporary file, will be deleted
+	offset      []int64  // offset into dataFile
+	bbox        []s2.Rect
+	webMercator []r2.Point
+	id          []string
+	byID        map[string]int // "W77" -> 3 if Features[3].ID == "W77"
 }
 
 func (c *Collection) Close() {
@@ -330,6 +334,38 @@ func (index *Index) watchFiles() {
 	}
 }
 
+func (index *Index) GetTile(collection string, zoom int, x int, y int) ([]byte, CollectionMetadata, error) {
+	index.mutex.RLock()
+	defer index.mutex.RUnlock()
+
+	coll := index.Collections[collection]
+	if coll == nil {
+		return nil, CollectionMetadata{}, NotFound
+	}
+
+	scale := 1 << uint8(zoom)
+	tileBounds := getTileBounds(zoom, x, y)
+	tileOrigin := r2.Point{X: float64(x) * 256.0 / float64(scale),
+		Y: float64(y) * 256.0 / float64(scale)}
+
+	dc := gg.NewContext(256, 256)
+	dc.SetRGBA255(255, 255, 255, 0)
+	dc.Clear()
+	for i, featureBounds := range coll.bbox {
+		if !tileBounds.Intersects(featureBounds) {
+			continue
+		}
+		p := coll.webMercator[i].Sub(tileOrigin).Mul(float64(scale))
+		dc.SetRGB255(195, 66, 244)
+		dc.DrawCircle(p.X, p.Y, 2)
+		dc.Fill()
+	}
+
+	var out bytes.Buffer
+	dc.EncodePNG(&out)
+	return out.Bytes(), coll.metadata, nil
+}
+
 func (index *Index) reloadIfChanged(md CollectionMetadata) {
 	if coll, err := readCollection(md.Name, md.Path, md.LastModified); err == nil {
 		log.Printf("success reading collection %s from %s", md.Name, md.Path)
@@ -419,6 +455,7 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 	numFeatures := len(features.Features)
 	coll.bbox = make([]s2.Rect, numFeatures)
 	coll.id = make([]string, numFeatures)
+	coll.webMercator = make([]r2.Point, numFeatures)
 	coll.offset = make([]int64, numFeatures+1)
 	coll.byID = make(map[string]int)
 
@@ -429,6 +466,9 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 		}
 
 		coll.bbox[i] = computeBounds(f.Geometry)
+		center := coll.bbox[i].Center()
+		coll.webMercator[i] = projectWebMercator(center)
+
 		if i > 0 {
 			if _, err := dataFile.Write([]byte(",\n")); err == nil {
 				pos += 2

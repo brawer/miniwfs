@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/golang/geo/r2"
 	"github.com/golang/geo/s2"
 )
 
@@ -27,6 +28,16 @@ func TestEncodeBbox_Empty(t *testing.T) {
 func TestGetTileBounds(t *testing.T) {
 	b := EncodeBbox(getTileBounds(12, 2148, 1436))
 	expectBbox("8.7890625,47.2195681,8.8769531,47.2792290", b, t)
+}
+
+func TestProjectWebMercator(t *testing.T) {
+	// https://developers.google.com/maps/documentation/javascript/examples/map-coordinates
+	got := projectWebMercator(s2.LatLngFromDegrees(41.850, -87.650))
+	expected := r2.Point{X: 65.67111111111113, Y: 95.17492654697409}
+	delta := got.Sub(expected)
+	if math.Abs(delta.X)+math.Abs(delta.Y) > 1e-9 {
+		t.Errorf("expected %v, got %v", expected, got)
+	}
 }
 
 func expectBbox(expected string, got []float64, t *testing.T) {
