@@ -351,6 +351,7 @@ func (index *Index) GetTile(collection string, zoom int, x int, y int) ([]byte, 
 	dc := gg.NewContext(256, 256)
 	dc.SetRGBA255(255, 255, 255, 0)
 	dc.Clear()
+	empty := true
 	for i, featureBounds := range coll.bbox {
 		if !tileBounds.Intersects(featureBounds) {
 			continue
@@ -359,6 +360,11 @@ func (index *Index) GetTile(collection string, zoom int, x int, y int) ([]byte, 
 		dc.SetRGB255(195, 66, 244)
 		dc.DrawCircle(p.X, p.Y, 2)
 		dc.Fill()
+		empty = false
+	}
+
+	if empty {
+		return emptyPNG, coll.metadata, nil
 	}
 
 	var out bytes.Buffer
