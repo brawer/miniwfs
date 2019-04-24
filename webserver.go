@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/geo/s1"
 	"github.com/golang/geo/s2"
 )
 
@@ -32,6 +33,8 @@ var itemRegexp = regexp.MustCompile(`^/collections/([^/]+)/items/(.+)$`)
 var listCollectionsRegexp = regexp.MustCompile(`^/collections/?$`)
 var tilesRegexp = regexp.MustCompile(
 	`^/tiles/([^/]+)/([^/]+)/([^/]+)/([^/]+)\.png$`)
+var tileFeatureInfoRegexp = regexp.MustCompile(
+	`^/tiles/([^/]+)/([0-9]+)/([0-9]+)/([0-9]+)/([0-9]+)/([0-9]+)\.geojson$`)
 
 func (s *WebServer) ListenAndServe(port int) error {
 	s.httpServer.Addr = ":" + strconv.Itoa(port)
@@ -46,7 +49,8 @@ func (s *WebServer) Shutdown() {
 }
 
 func (s *WebServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
-	if m := tilesRegexp.FindStringSubmatch(req.URL.Path); len(m) == 5 {
+	path := req.URL.Path
+	if m := tilesRegexp.FindStringSubmatch(path); len(m) == 5 {
 		zoom, _ := strconv.Atoi(m[2])
 		x, _ := strconv.Atoi(m[3])
 		y, _ := strconv.Atoi(m[4])
@@ -54,17 +58,29 @@ func (s *WebServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if m := collectionRegexp.FindStringSubmatch(req.URL.Path); len(m) == 2 {
+	if m := tileFeatureInfoRegexp.FindStringSubmatch(path); len(m) == 7 {
+		collection := m[1]
+		zoom, _ := strconv.ParseUint(m[2], 10, 8)
+		x, _ := strconv.ParseUint(m[3], 10, 32)
+		y, _ := strconv.ParseUint(m[4], 10, 32)
+		i, _ := strconv.ParseUint(m[5], 10, 32)
+		j, _ := strconv.ParseUint(m[6], 10, 32)
+		tile := &TileKey{X: uint32(x), Y: uint32(y), Zoom: uint8(zoom)}
+		s.handleTileFeatureInfoRequest(w, req, collection, tile, int(i), int(j))
+		return
+	}
+
+	if m := collectionRegexp.FindStringSubmatch(path); len(m) == 2 {
 		s.handleCollectionRequest(w, req, m[1])
 		return
 	}
 
-	if m := itemRegexp.FindStringSubmatch(req.URL.Path); len(m) == 3 {
+	if m := itemRegexp.FindStringSubmatch(path); len(m) == 3 {
 		s.handleItemRequest(w, req, m[1], m[2])
 		return
 	}
 
-	if m := listCollectionsRegexp.FindStringSubmatch(req.URL.Path); len(m) == 1 {
+	if m := listCollectionsRegexp.FindStringSubmatch(path); len(m) == 1 {
 		s.handleListCollectionsRequest(w, req)
 		return
 	}
@@ -180,8 +196,9 @@ func (s *WebServer) handleCollectionRequest(w http.ResponseWriter, req *http.Req
 	}
 
 	var buf bytes.Buffer
+	includeLinks := true
 	metadata, err := s.index.GetItems(collection, startID, start, limit, bbox,
-		ifModifiedSince, ifUnmodifiedSince, &buf)
+		ifModifiedSince, ifUnmodifiedSince, includeLinks, &buf)
 	if status := getHTTPStatus(err); status != http.StatusOK {
 		w.WriteHeader(status)
 		return
@@ -276,6 +293,48 @@ func (s *WebServer) handleTileRequest(w http.ResponseWriter, req *http.Request,
 	header.Set("Last-Modified", metadata.LastModified.UTC().Format(http.TimeFormat))
 	w.WriteHeader(http.StatusOK)
 	w.Write(tile)
+}
+
+func (s *WebServer) handleTileFeatureInfoRequest(
+	w http.ResponseWriter, req *http.Request,
+	collection string, tile *TileKey, i int, j int) {
+	if i < 0 || i > 256 || j < 0 || j >= 256 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	tileBounds := tile.Bounds()
+	tileSize := tileBounds.Size()
+	pixelSize := s2.LatLng{Lat: tileSize.Lat / 256, Lng: tileSize.Lng / 256}
+	center := s2.LatLng{
+		Lat: s1.Angle(tileBounds.Hi().Lat.Radians() - pixelSize.Lat.Radians()*float64(j)),
+		Lng: s1.Angle(tileBounds.Lo().Lng.Radians() + pixelSize.Lng.Radians()*float64(i))}
+	maxSignatureWidth := 8.0 // pixels
+	bboxSize := s2.LatLng{
+		Lat: s1.Angle(pixelSize.Lat.Radians() * maxSignatureWidth),
+		Lng: s1.Angle(pixelSize.Lng.Radians() * maxSignatureWidth)}
+	bbox := s2.RectFromCenterSize(center, bboxSize)
+
+	ifModifiedSince, _ := http.ParseTime(req.Header.Get("If-Modified-Since"))
+	ifUnmodifiedSince, _ := http.ParseTime(req.Header.Get("If-Unmodified-Since"))
+	limit := 10
+	includeLinks := false
+	var buf bytes.Buffer
+	metadata, err := s.index.GetItems(collection, "", 0, limit, bbox,
+		ifModifiedSince, ifUnmodifiedSince, includeLinks, &buf)
+	if status := getHTTPStatus(err); status != http.StatusOK {
+		w.WriteHeader(status)
+		return
+	}
+
+	header := w.Header()
+	header.Set("Access-Control-Allow-Origin", "*")
+	header.Set("Content-Length", strconv.Itoa(buf.Len()))
+	header.Set("Content-Type", "application/geo+json")
+	header.Set("Last-Modified", metadata.LastModified.UTC().Format(http.TimeFormat))
+
+	w.WriteHeader(http.StatusOK)
+	buf.WriteTo(w)
 }
 
 func getHTTPStatus(err error) int {

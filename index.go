@@ -179,7 +179,7 @@ func (index *Index) GetItem(collection string, id string) (*geojson.Feature, err
 // If the collection has not been modified since time ifModifiedSince,
 // we return error NotModified (unless ifModifiedSince.IsZero() is true).
 func (index *Index) GetItems(collection string, startID string, startIndex int, limit int, bbox s2.Rect,
-	ifModifiedSince time.Time, ifUnmodifiedSince time.Time, out io.Writer) (CollectionMetadata, error) {
+	ifModifiedSince time.Time, ifUnmodifiedSince time.Time, includeLinks bool, out io.Writer) (CollectionMetadata, error) {
 	// We intentionally return CollectionMetadata and not *CollectionMetadata
 	// so that the metadata gets copied before unlocking the reader mutex.
 	// Otherwise, the metadata content could change after returning from
@@ -286,18 +286,20 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 		Type:  "application/geo+json",
 	}
 
-	selfLink.Href = FormatItemsURL(pathPrefix, collection, startID, startIndex, limit, bbox)
-	footer.Links = append(footer.Links, selfLink)
 	footer.BoundingBox = EncodeBbox(bounds)
+	if includeLinks {
+		selfLink.Href = FormatItemsURL(pathPrefix, collection, startID, startIndex, limit, bbox)
+		footer.Links = append(footer.Links, selfLink)
 
-	if nextIndex > 0 {
-		nextLink := &WFSLink{
-			Rel:   "next",
-			Title: "next",
-			Type:  "application/geo+json",
+		if nextIndex > 0 {
+			nextLink := &WFSLink{
+				Rel:   "next",
+				Title: "next",
+				Type:  "application/geo+json",
+			}
+			nextLink.Href = FormatItemsURL(pathPrefix, collection, nextID, nextIndex, limit, bbox)
+			footer.Links = append(footer.Links, nextLink)
 		}
-		nextLink.Href = FormatItemsURL(pathPrefix, collection, nextID, nextIndex, limit, bbox)
-		footer.Links = append(footer.Links, nextLink)
 	}
 
 	encodedFooter, err := json.Marshal(footer)

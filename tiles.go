@@ -8,6 +8,7 @@ import (
 
 	"github.com/fogleman/gg"
 	"github.com/golang/geo/r2"
+	"github.com/golang/geo/s2"
 )
 
 // Transparent 1x1 pixel PNG tile, 67 bytes
@@ -55,6 +56,11 @@ type TileKey struct {
 	X    uint32
 	Y    uint32
 	Zoom uint8
+}
+
+func (t *TileKey) Bounds() s2.Rect {
+	r := s2.RectFromLatLng(unprojectWebMercator(int(t.Zoom), float64(t.X), float64(t.Y)))
+	return r.AddPoint(unprojectWebMercator(int(t.Zoom), float64(t.X+1), float64(t.Y+1)))
 }
 
 type TileCache struct {

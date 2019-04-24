@@ -74,9 +74,10 @@ func TestGetItem_NoSuchItem(t *testing.T) {
 }
 
 func getItems(index *Index, collection string, startID string, startIndex int, limit int, bbox s2.Rect) (*WFSFeatureCollection, *CollectionMetadata, error) {
+	includeLinks := true
 	var buf bytes.Buffer
 	md, err := index.GetItems(collection, startID, startIndex, limit, bbox,
-		noTime, noTime, &buf)
+		noTime, noTime, includeLinks, &buf)
 	if err != nil {
 		return nil, nil, err
 	}

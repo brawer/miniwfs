@@ -324,6 +324,134 @@ func TestItem(t *testing.T) {
         }`)
 }
 
+func TestTilesFeatureInfo(t *testing.T) {
+	index, s := makeServer(t)
+	defer s.Shutdown()
+	defer index.Close()
+	query, _ := http.NewRequest("GET", "/tiles/castles/17/69585/46595/102/50.geojson", nil)
+	handler := http.HandlerFunc(s.HandleRequest)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, query)
+	if ct := resp.Header().Get("Content-Type"); ct != "application/geo+json" {
+		t.Errorf("Expected Content-Type: application/geo+json, got %s", ct)
+	}
+	expectCORSHeader(t, resp.Header())
+	expectJSON(t, getBody(resp), `{
+          "type": "FeatureCollection",
+          "features": [
+            {
+              "id": "W24785843",
+              "type": "Feature",
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      11.1221624,
+                      46.0670118
+                    ],
+                    [
+                      11.1221546,
+                      46.0670507
+                    ],
+                    [
+                      11.1221723,
+                      46.0670574
+                    ],
+                    [
+                      11.1221842,
+                      46.0670731
+                    ],
+                    [
+                      11.1221869,
+                      46.067097
+                    ],
+                    [
+                      11.1221766,
+                      46.0671192
+                    ],
+                    [
+                      11.1221453,
+                      46.067136
+                    ],
+                    [
+                      11.1221161,
+                      46.0671393
+                    ],
+                    [
+                      11.1220222,
+                      46.0674756
+                    ],
+                    [
+                      11.1219216,
+                      46.0674735
+                    ],
+                    [
+                      11.1219202,
+                      46.0675053
+                    ],
+                    [
+                      11.1218793,
+                      46.0675034
+                    ],
+                    [
+                      11.1218347,
+                      46.0675014
+                    ],
+                    [
+                      11.1218655,
+                      46.0672963
+                    ],
+                    [
+                      11.1218916,
+                      46.0670783
+                    ],
+                    [
+                      11.1218991,
+                      46.0669992
+                    ],
+                    [
+                      11.1220515,
+                      46.067004
+                    ],
+                    [
+                      11.1221624,
+                      46.0670118
+                    ]
+                  ]
+                ]
+              },
+              "properties": {
+                "building": "yes",
+                "historic": "castle",
+                "name": "Palazzo Pretorio",
+                "wikidata": "Q26997946"
+              }
+            }
+          ],
+          "bbox": [
+            11.1218347,
+            46.0669992,
+            11.1221869,
+            46.0675053
+          ]
+	}`)
+}
+
+func TestTilesFeatureInfo_NotFound(t *testing.T) {
+	index, s := makeServer(t)
+	defer s.Shutdown()
+	defer index.Close()
+	query, _ := http.NewRequest("GET", "/tiles/nosuchcollection/1/2/3.geojson", nil)
+	handler := http.HandlerFunc(s.HandleRequest)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, query)
+	r := resp.Result()
+	if r.StatusCode != http.StatusNotFound {
+		t.Errorf("expected %d, got %d", http.StatusNotFound, r.StatusCode)
+	}
+}
+
 func expectCORSHeader(t *testing.T, header http.Header) {
 	if cors := header.Get("Access-Control-Allow-Origin"); cors != "*" {
 		t.Errorf("expected header \"Access-Control-Allow-Origin: *\", got %s", cors)
