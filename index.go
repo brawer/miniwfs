@@ -39,6 +39,7 @@ type CollectionMetadata struct {
 
 type Collection struct {
 	metadata    CollectionMetadata
+	tileCache   *TileCache
 	dataFile    *os.File // temporary file, will be deleted
 	offset      []int64  // offset into dataFile
 	bbox        []s2.Rect
@@ -66,6 +67,14 @@ var (
 	numDataLoadErrors = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "miniwfs_data_load_errors_total",
 		Help: "Total number of errors when loading data.",
+	})
+	numTileCacheHits = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "miniwfs_tilecache_hits_total",
+		Help: "Total number of tile cache hits.",
+	})
+	numTileCacheMisses = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "miniwfs_tilecache_misses_total",
+		Help: "Total number of tile cache misses.",
 	})
 	collectionFeaturesCount = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "miniwfs_collection_features",
@@ -336,9 +345,19 @@ func (index *Index) GetTile(collection string, zoom int, x int, y int) ([]byte, 
 	index.mutex.RLock()
 	defer index.mutex.RUnlock()
 
+	if x < 0 || y < 0 || zoom < 0 || zoom > 30 {
+		return nil, CollectionMetadata{}, NotFound
+	}
+	tileKey := TileKey{X: uint32(x), Y: uint32(y), Zoom: uint8(zoom)}
+
 	coll := index.Collections[collection]
 	if coll == nil {
 		return nil, CollectionMetadata{}, NotFound
+	}
+
+	if cached := coll.tileCache.Get(tileKey); cached != nil {
+		numTileCacheHits.Inc()
+		return cached, coll.metadata, nil
 	}
 
 	scale := 1 << uint8(zoom)
@@ -354,7 +373,10 @@ func (index *Index) GetTile(collection string, zoom int, x int, y int) ([]byte, 
 		p := coll.webMercator[i].Sub(tileOrigin).Mul(float64(scale))
 		tile.DrawPoint(p)
 	}
-	return tile.ToPNG(), coll.metadata, nil
+	png := tile.ToPNG()
+	coll.tileCache.Put(tileKey, png)
+	numTileCacheMisses.Inc()
+	return png, coll.metadata, nil
 }
 
 func (index *Index) reloadIfChanged(md CollectionMetadata) {
@@ -419,7 +441,7 @@ func readCollection(name string, path string, ifModifiedSince time.Time) (*Colle
 		return nil, err
 	}
 
-	coll := &Collection{}
+	coll := &Collection{tileCache: NewTileCache(10000)}
 	coll.metadata.LastModified = stat.ModTime()
 	coll.metadata.Name = name
 	coll.metadata.Path = absPath

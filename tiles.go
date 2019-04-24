@@ -2,6 +2,10 @@ package main
 
 import (
 	"bytes"
+	"container/list"
+	"sync"
+	"sync/atomic"
+
 	"github.com/fogleman/gg"
 	"github.com/golang/geo/r2"
 )
@@ -44,5 +48,72 @@ func (t *Tile) ToPNG() []byte {
 		return png.Bytes()
 	} else {
 		return emptyPNG
+	}
+}
+
+type TileKey struct {
+	X    uint32
+	Y    uint32
+	Zoom uint8
+}
+
+type TileCache struct {
+	locks   [128]sync.Mutex
+	lists   [128]list.List
+	content [128]map[TileKey]*list.Element
+	size    int32
+	maxSize int32
+}
+
+type tileCacheEntry struct {
+	key   TileKey
+	value []byte
+}
+
+func NewTileCache(maxSize int32) *TileCache {
+	tc := &TileCache{maxSize: maxSize}
+	for i, _ := range tc.content {
+		tc.content[i] = make(map[TileKey]*list.Element)
+	}
+	return tc
+}
+
+func getShard(key TileKey) int {
+	return int((key.X ^ key.Y ^ (uint32(key.Zoom) << 4)) & 127)
+}
+
+func (tc *TileCache) Get(key TileKey) []byte {
+	shard := getShard(key)
+	tc.locks[shard].Lock()
+	defer tc.locks[shard].Unlock()
+
+	if e, hit := tc.content[shard][key]; hit {
+		tc.lists[shard].MoveToFront(e)
+		return e.Value.(*tileCacheEntry).value
+	}
+
+	return nil
+}
+
+func (tc *TileCache) Put(key TileKey, value []byte) {
+	shard := getShard(key)
+	tc.locks[shard].Lock()
+	defer tc.locks[shard].Unlock()
+	list := &tc.lists[shard]
+
+	if e, hit := tc.content[shard][key]; hit {
+		list.MoveToFront(e)
+		e.Value.(*tileCacheEntry).value = value
+		return
+	}
+
+	e := list.PushFront(&tileCacheEntry{key, value})
+	tc.content[shard][key] = e
+	if size := atomic.AddInt32(&tc.size, 1); size > tc.maxSize {
+		if oldest := list.Back(); oldest != e {
+			list.Remove(oldest)
+			delete(tc.content[shard], oldest.Value.(*tileCacheEntry).key)
+			atomic.AddInt32(&tc.size, -1)
+		}
 	}
 }
