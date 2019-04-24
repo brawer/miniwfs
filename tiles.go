@@ -1,5 +1,11 @@
 package main
 
+import (
+	"bytes"
+	"github.com/fogleman/gg"
+	"github.com/golang/geo/r2"
+)
+
 // Transparent 1x1 pixel PNG tile, 67 bytes
 // http://garethrees.org/2007/11/14/pngcrush/
 var emptyPNG []byte = []byte{
@@ -12,4 +18,31 @@ var emptyPNG []byte = []byte{
 	0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00,
 	0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
 	0x42, 0x60, 0x82,
+}
+
+type Tile struct {
+	dc *gg.Context
+}
+
+func (t *Tile) DrawPoint(p r2.Point) {
+	dc := t.dc
+	if dc == nil {
+		t.dc = gg.NewContext(256, 256)
+		dc = t.dc
+		dc.SetRGBA255(255, 255, 255, 0)
+		dc.Clear()
+		dc.SetRGB255(195, 66, 244)
+	}
+	dc.DrawCircle(p.X, p.Y, 2)
+	dc.Fill()
+}
+
+func (t *Tile) ToPNG() []byte {
+	if dc := t.dc; dc != nil {
+		var png bytes.Buffer
+		dc.EncodePNG(&png)
+		return png.Bytes()
+	} else {
+		return emptyPNG
+	}
 }

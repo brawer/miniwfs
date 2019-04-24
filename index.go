@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	//"fmt"
@@ -17,7 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fogleman/gg"
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/geo/r2"
 	"github.com/golang/geo/s2"
@@ -348,28 +346,15 @@ func (index *Index) GetTile(collection string, zoom int, x int, y int) ([]byte, 
 	tileOrigin := r2.Point{X: float64(x) * 256.0 / float64(scale),
 		Y: float64(y) * 256.0 / float64(scale)}
 
-	dc := gg.NewContext(256, 256)
-	dc.SetRGBA255(255, 255, 255, 0)
-	dc.Clear()
-	empty := true
+	var tile Tile
 	for i, featureBounds := range coll.bbox {
 		if !tileBounds.Intersects(featureBounds) {
 			continue
 		}
 		p := coll.webMercator[i].Sub(tileOrigin).Mul(float64(scale))
-		dc.SetRGB255(195, 66, 244)
-		dc.DrawCircle(p.X, p.Y, 2)
-		dc.Fill()
-		empty = false
+		tile.DrawPoint(p)
 	}
-
-	if empty {
-		return emptyPNG, coll.metadata, nil
-	}
-
-	var out bytes.Buffer
-	dc.EncodePNG(&out)
-	return out.Bytes(), coll.metadata, nil
+	return tile.ToPNG(), coll.metadata, nil
 }
 
 func (index *Index) reloadIfChanged(md CollectionMetadata) {
