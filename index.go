@@ -275,7 +275,7 @@ func (index *Index) GetItems(collection string, startID string, startIndex int, 
 
 	type Footer struct {
 		Links       []*WFSLink `json:"links,omitempty"`
-		BoundingBox []float64  `json:"bbox,omitempty"`
+		BoundingBox []float64  `json:"bbox"`
 	}
 	var footer Footer
 

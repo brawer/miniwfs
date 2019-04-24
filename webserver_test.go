@@ -438,6 +438,26 @@ func TestTilesFeatureInfo(t *testing.T) {
 	}`)
 }
 
+func TestTilesFeatureInfo_NoFeatures(t *testing.T) {
+	index, s := makeServer(t)
+	defer s.Shutdown()
+	defer index.Close()
+	query, _ := http.NewRequest("GET", "/tiles/castles/17/69585/46595/10/5.geojson", nil)
+	handler := http.HandlerFunc(s.HandleRequest)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, query)
+	if ct := resp.Header().Get("Content-Type"); ct != "application/geo+json" {
+		t.Errorf("Expected Content-Type: application/geo+json, got %s", ct)
+	}
+	expectCORSHeader(t, resp.Header())
+	expectJSON(t, getBody(resp), `{
+          "type": "FeatureCollection",
+          "features": [
+          ],
+	  "bbox": null
+        }`)
+}
+
 func TestTilesFeatureInfo_NotFound(t *testing.T) {
 	index, s := makeServer(t)
 	defer s.Shutdown()
