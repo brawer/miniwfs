@@ -4,9 +4,39 @@ import (
 	"bytes"
 	"github.com/golang/geo/r2"
 	"image/png"
+	"math"
+	"math/rand"
 	"reflect"
 	"testing"
 )
+
+func BenchmarkTile0Points(b *testing.B) {
+	benchmarkTileNPoints(b, 0)
+}
+
+func BenchmarkTile10Points(b *testing.B) {
+	benchmarkTileNPoints(b, 10)
+}
+
+func BenchmarkTile100Points(b *testing.B) {
+	benchmarkTileNPoints(b, 100)
+}
+
+func benchmarkTileNPoints(b *testing.B, n int) {
+	rnd := rand.New(rand.NewSource(12345))
+	points := make([]r2.Point, n)
+	for i := 0; i < len(points); i++ {
+		points[i].X = math.Mod(rnd.Float64(), 256.0+20.0) - 10.0
+		points[i].Y = math.Mod(rnd.Float64(), 256.0+20.0) - 10.0
+	}
+	for i := 0; i < b.N; i++ {
+		var tile Tile
+		for _, p := range points {
+			tile.DrawPoint(p)
+		}
+		tile.ToPNG()
+	}
+}
 
 func TestEmptyPNG(t *testing.T) {
 	img, err := png.Decode(bytes.NewReader(emptyPNG))
