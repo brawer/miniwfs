@@ -384,8 +384,8 @@ func (index *Index) reloadIfChanged(md CollectionMetadata) {
 		log.Printf("success reading collection %s from %s", md.Name, md.Path)
 		index.replaceCollection(coll)
 	} else if err == NotModified {
-		log.Printf("no change in collection %s at %s",
-			md.Name, md.Path)
+		// log.Printf("no change in collection %s at %s",
+		//	md.Name, md.Path)
 	} else {
 		log.Printf("error reading collection %s at %s: %v",
 			md.Name, md.Path, err)
