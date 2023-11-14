@@ -9,5 +9,5 @@ require (
 	github.com/golang/geo v0.0.0-20181008215305-476085157cff
 	github.com/paulmach/go.geojson v1.4.0
 	github.com/prometheus/client_golang v1.11.1
-	golang.org/x/image v0.5.0 // indirect
+	golang.org/x/image v0.10.0 // indirect
 )
